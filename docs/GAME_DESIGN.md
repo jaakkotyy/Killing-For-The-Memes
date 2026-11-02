@@ -1,0 +1,87 @@
+# Game Design — Killing for the Memes
+
+Living design document. Rules here are the source of truth for `src/core/`.
+Tunable numbers live in one config resource (see `src/core/`), not scattered in code.
+
+## Pitch
+
+3–8 friends are chained to chairs around a table in a grimy, trap-filled room. A creepy host
+runs a "game": every round everyone makes a meme for a prompt, the room judges them, and the
+author of the worst meme is killed off in an over-the-top cartoon death. Last survivor wins.
+
+Tone: dark comedy first, horror flavour second. Deaths are slapstick (confetti, springs,
+anvils, comically oversized contraptions), never realistic gore.
+
+## Originality rules
+
+Everything is original. Specifically **avoid** anything that evokes the Saw franchise:
+no tricycle-riding puppet, no pig masks, no reverse bear trap, no "I want to play a game"
+phrasing, no tape recorders as the host's voice. Keep the host, room and traps our own.
+
+## The Host (placeholder concept)
+
+A lanky game-show mannequin in a stained tuxedo whose head is a cracked CRT television
+showing a pixel-art grin and expressions. Speaks in cheerful game-show patter.
+Name: TBD (placeholder: "The Host").
+
+## Presentation: 2D and 3D at the same time
+
+- The room, players and host are low-poly 3D with moody lighting.
+- Each player has an old CRT monitor in front of them. To make a meme, the camera zooms into
+  the screen and the player works in a flat 2D editor. The editor is rendered in a
+  `SubViewport` that is also the monitor's screen texture, so the zoom is seamless.
+- During judging the camera pulls back; the meme is shown on a big wall TV while a
+  spotlight focuses on the presenting player.
+
+## Core round loop (MVP)
+
+1. **Prompt** — the host announces a prompt (from the active prompt pack).
+2. **Create** — all living players make a meme simultaneously on a timer
+   (pick a template, add top/bottom captions in a classic meme font).
+3. **Spotlight reveal** — memes are shown one at a time on the wall TV. While a player is
+   in the spotlight, everyone else votes and may shoot.
+4. **Tally** — scores are computed by the server.
+5. **Elimination** — lowest score dies with a cartoon death.
+6. Repeat until one living player remains → **win screen**.
+
+## Scoring (MVP defaults — all tunable)
+
+| Action | Effect on spotlight player |
+|---|---|
+| 👍 vote | +1 |
+| 👎 vote | −1 |
+| No vote | 0 |
+| Bullet | −3, visible to everyone |
+
+- Each voter casts at most one 👍/👎 per spotlight and may change it until the spotlight ends.
+- Bullets: **2 per player for the whole game**; at most 1 bullet per spotlight per shooter.
+- You cannot vote on or shoot yourself.
+- **No submission** → automatically ranked last for the round (still shown as a blank meme).
+- **Tie-break** for lowest score: most bullets received this round → if still tied, the host
+  picks at random (server RNG, announced dramatically).
+- **Eliminated players** (MVP) stay as spectators who can still 👍/👎 vote, but cannot shoot.
+  This keeps the final 1v1 decidable. Full "ghost" mechanics come later.
+
+## Default timings (tunable)
+
+- Prompt announcement: ~5 s
+- Meme creation: 75 s
+- Spotlight per meme: 12 s
+- Elimination sequence: ~6 s
+
+## Disconnects
+
+- A player who disconnects mid-game is treated as eliminated (dramatic "walked out" death).
+- If the host (server) disconnects, the game ends for everyone and clients return to the menu.
+- No late joining once a game has started.
+
+## Post-MVP (design for, don't build yet)
+
+- **Ghosts**: eliminated players haunt the room, vote, and interfere with living players.
+- **Waiting activities** (modular plug-ins in `src/activities/`): sabotage another player's
+  meme, bet on who dies to earn bullets, lockpicking minigame for a one-time escape, throwing
+  physics objects at the spotlight player.
+- **HP mode**: damage instead of instant death.
+- **GIF templates** via a GIF API.
+- **Custom prompt packs** (JSON in `data/prompts/`, later user-loadable / Workshop).
+- **Steam**: lobbies, friend invites, P2P relay networking, achievements, rich presence.
