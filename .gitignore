@@ -1,0 +1,19 @@
+# Godot 4 cache/import data (regenerated on import)
+.godot/
+/android/
+
+# Exported builds
+builds/
+
+# Godot may store export credentials here; never commit secrets
+export_credentials.cfg
+
+# Steam (added once Steamworks is integrated)
+steam_appid.txt
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.tmp
+.vscode/
+.idea/
