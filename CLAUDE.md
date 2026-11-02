@@ -29,32 +29,56 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 
 ```powershell
 .\tools\run_tests.ps1                # import + run all unit tests headless
+.\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
+.\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
 ```
+
+Run `run_tests.ps1` before every commit and `smoke_test.ps1` before merging networking
+changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
+`src/util/launch_options.gd` and the README.
+
+Godot headless output can be very large; when running it from PowerShell, redirect to a
+file (`*> file.log`) and search the file instead of piping straight into `Select-String`.
 
 ## Architecture
 
 Layers, with dependencies pointing **downward only**:
 
 ```
-ui/, world/, meme/      presentation: render state, emit player intents
+ui/, world/, meme/        presentation: read Session state, call Session methods, listen to signals
         │
-net/ (+ autoload/Net)   ServerController applies intents to core; ClientController mirrors state
+autoload/App              scene flow (menu → lobby → room) driven by Session signals
+autoload/Session          RPC bridge: the ONLY place with @rpc functions; holds the client mirror
+        │                 and (on the host) a ServerController
+net/ServerController      authoritative logic on the host; validates intents, emits what to broadcast
+autoload/Net + transports connection lifecycle; installs the MultiplayerPeer from a NetTransport
         │
-core/                   pure rules: RefCounted classes, no Nodes, no networking, no scene tree
+core/                     pure rules: RefCounted classes, no Nodes, no networking, no scene tree
 ```
+
+Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 
 - **`src/core/`** — game rules as plain `RefCounted` classes: round state machine, scoring,
   player state, `MemeSpec`. Deterministic given inputs (inject RNG/seed). Fully unit-tested.
   Never references `multiplayer`, nodes or UI.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`
-  later. A transport only creates/destroys a Godot `MultiplayerPeer` and reports lobby info;
-  RPC code never knows which transport is active.
-  - `ServerController` (runs only on the host) owns the authoritative `core` state and timers,
-    validates every client intent, and broadcasts state changes/events.
-  - `ClientController` receives state/events and exposes signals for the presentation layer.
-  - Clients send **intents** only (`submit_meme`, `cast_vote`, `shoot`, `set_ready`…), never state.
-  - All RPC method names and payload shapes are documented in `src/net/protocol.gd`.
+  (stub) later. A transport only creates a Godot `MultiplayerPeer` (reported through the
+  `peer_ready`/`failed` signals, because Steam lobby creation is async) and reports join info.
+  RPC code never knows which transport is active; `Net.set_transport()` swaps it.
+  - `ServerController` (host only) owns the authoritative state, validates every intent
+    (RPC arguments arrive as `Variant` and are type-checked), and emits signals saying what
+    to broadcast. It never touches the network, so it is unit-tested directly.
+  - `Session` autoload is the RPC bridge on every peer: client→server intents via
+    `rpc_id(1, …)`, server→client snapshots via `rpc_id(peer, …)`. The host calls
+    `ServerController` directly instead of sending RPCs to itself. Clients keep a read-only
+    mirror (`Session.lobby`) rebuilt from snapshots, and the UI only reads that mirror.
+  - Clients send **intents** only (`request_join`, `set_ready`, later `submit_meme`,
+    `cast_vote`, `shoot`…), never state. `server_relay` is off: clients never talk to each other.
+  - All RPC method names and payload shapes are listed in `src/net/protocol.gd`. Bump
+    `Protocol.VERSION` when any of them change.
+  - `JoinCode` turns IPv4 + port into a 10-character code (Crockford base32). It is a
+    convenience only, not a matchmaking service.
 - **`src/platform/`** — `PlatformService` (achievements, friend names, invites, rich presence)
   with `NullPlatform` now, `SteamPlatform` later.
 - **`src/meme/`** — memes travel over the network as a small `MemeSpec` dictionary
@@ -91,7 +115,9 @@ core/                   pure rules: RefCounted classes, no Nodes, no networking,
 ## Milestones
 
 - [x] **M0** Project setup: Godot project, docs, GUT, Windows export preset
-- [ ] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up
+- [x] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up,
+  join rejection (version/full/started/timeout), local multi-instance + smoke test scripts.
+  The room scene (`src/world/room/`) is still a 2D placeholder.
 - [ ] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win
 - [ ] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig
 - [ ] **M4** Meme editor + CRT zoom transition
@@ -107,3 +133,7 @@ core/                   pure rules: RefCounted classes, no Nodes, no networking,
 - Eliminated players spectate and can still vote in the MVP (prevents final 1v1 deadlock).
 - Code is proprietary (all rights reserved); no open-source license.
 - No Git LFS until binary assets grow large.
+- Do NOT use `MultiplayerPeer.refuse_new_connections` to lock a started game: ENet lets the
+  peer connect and then silently ignores it, so the client hangs. Let late joiners connect;
+  `ServerController` rejects them with a readable reason and Session kicks them.
+- The host never needs to "ready up"; pressing Start is its readiness.

@@ -7,7 +7,7 @@ shoots), and the author of the worst meme dies a ridiculous cartoon death. Last 
 Built with **Godot 4.7.2** (GDScript). Windows first; Linux/macOS later. Designed so Steam
 integration (GodotSteam) can be added without rewriting the game.
 
-> Status: **M0 — project setup**. See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
+> Status: **M1 — networking skeleton** (menu, host/join, lobby). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
 > design and [CLAUDE.md](CLAUDE.md) for architecture and conventions.
 
 ## Requirements
@@ -50,12 +50,44 @@ Or in the editor: *Project → Export… → Windows Desktop*.
 
 ## Testing multiplayer locally
 
-_Available from milestone M1 (networking skeleton)._ Planned workflow:
+You can run several instances of the game on one machine; they connect over `127.0.0.1`.
 
-- **From the editor:** *Debug → Customize Run Instances…*, enable multiple instances
-  (e.g. 4) and give the first one the argument `--host` and the others `--join=127.0.0.1`.
-  F5 then launches all of them.
-- **From a script:** `.\tools\run_local.ps1 -Clients 3` starts one host and three clients.
+**Script (recommended):** starts a host plus N clients in tiled windows. Clients ready up
+automatically; press **Start game** in the host window.
+
+```powershell
+.\tools\run_local.ps1                 # host + 2 clients (3 is the minimum to start)
+.\tools\run_local.ps1 -Clients 5      # host + 5 clients
+.\tools\run_local.ps1 -Clients 1 -MinPlayers 2 -AutoStart
+```
+
+**Automated smoke test:** runs headless instances that join, ready up and start a game,
+and fails if any of them doesn't get there. Run it before merging networking changes.
+
+```powershell
+.\tools\smoke_test.ps1 -Clients 3
+```
+
+**From the editor:** *Debug → Customize Run Instances…* → enable multiple instances, then
+set launch arguments per instance, e.g. `-- --host --name=Host` for the first and
+`-- --join=127.0.0.1 --name=Bob --auto-ready` for the others. F5 launches them all.
+
+**By hand:** start the game twice, click *Host game* in one and type `127.0.0.1` in the other.
+
+### Developer launch flags
+
+Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
+
+| Flag | Effect |
+|---|---|
+| `--host` | Host immediately |
+| `--join=<target>` | Join immediately (IP, IP:port or join code) |
+| `--name=<name>` | Player name for this instance (not saved) |
+| `--port=<port>` | Port to host on (default 7777) |
+| `--auto-ready` | Ready up automatically in the lobby |
+| `--auto-start` | Host starts as soon as everyone is ready |
+| `--min-players=<n>` | Lower the 3-player minimum (debug builds only) |
+| `--smoke-test` | Exit 0 once the game starts, non-zero on failure |
 
 ## Playing over the internet (before Steam)
 
@@ -63,6 +95,10 @@ Until Steam networking is integrated, connections are direct (ENet over UDP). Th
 either forward **UDP port 7777** on their router, or everyone joins the same virtual LAN with
 a tool like [Tailscale](https://tailscale.com) or [ZeroTier](https://www.zerotier.com) and
 connects to the host's virtual IP. Steam's relay networking will remove this requirement.
+
+The lobby shows the host's addresses with a **join code** for each. A join code is just
+the IP and port written in a friendlier form (e.g. `60N1J-907KH`), so it only works where
+that address is reachable. With port forwarding, friends type the host's *public* IP instead.
 
 ## Project structure
 
@@ -72,16 +108,17 @@ assets/        fonts, models, textures, audio, meme templates
 data/prompts/  prompt packs (JSON)
 docs/          design documents
 src/
-  autoload/    global singletons (Net, Platform, Session, Settings)
+  autoload/    global singletons (Settings, Platform, Net, Session, App)
   core/        pure game rules — no nodes, no networking
-  net/         transport abstraction (ENet now, Steam later), server/client controllers
+  net/         transport abstraction (ENet now, Steam later), server controller, protocol
   platform/    platform services abstraction (Null now, Steam later)
+  util/        small helpers (launch options)
   world/       3D room, seats, CRT monitors, wall TV, host, camera rig
   meme/        meme editor and renderer, template library
   activities/  modular "while you wait" activities (post-MVP)
   ui/          menus, lobby, HUD, voting, win screen
 tests/unit/    GUT unit tests
-tools/         PowerShell helper scripts
+tools/         PowerShell helper scripts (tests, build, local multiplayer, smoke test)
 ```
 
 ## Credits
