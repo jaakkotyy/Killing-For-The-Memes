@@ -51,7 +51,14 @@ It prints `SKIN groups=21 unweighted_verts=0 / 9974`, the seat calibration and o
    `SEATED`/`FLINCH` dictionaries and `make_action()`.
 5. Godot strips a `_loop` suffix from animation names and loops them. Update the names in
    `src/world/player/player_avatar.gd` when adding animations.
-6. Credits: the user's own models go in `CREDITS.md` as original work. Ask who made any
+6. **Static props** (no rig): add an entry to `PROPS` in `tools/blender/build_props.py`
+   (objects to keep, game material per slot, subdivision level, real height or width,
+   triangle budget) and the name to the loop in `tools/build_models.ps1`; then
+   `.\tools\build_models.ps1 -PropsOnly`. Check its `PROP <name> tris=... size=...` line:
+   sizes must be real-world metres. Studio floors/lights/particle helpers are left out.
+   Close-up check in Godot: a throwaway scene with a Camera3D aimed at `seat.drink`
+   (delete it afterwards). Glass reads greenish because the CRTs light the room green.
+7. Credits: the user's own models go in `CREDITS.md` as original work. Ask who made any
    model before crediting it.
 
 ## Pitfalls (all hit in practice)

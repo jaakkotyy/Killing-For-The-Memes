@@ -34,7 +34,7 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
-.\tools\build_models.ps1 [-SkipBake] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
+.\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 .\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
 ```
 
@@ -112,7 +112,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   the draft when its countdown hits zero.
 - **`src/world/`** — 3D room. `room/room.gd` builds the greybox room in code and places one
   `Seat` per player with `SeatLayout` (an arc that leaves the TV side open for the host).
-  A seat holds the chair, `PlayerAvatar` (the artist's model from `assets/models/player/`,
+  A seat holds the chair, a drink (the artist's props from `assets/models/props/`, picked by
+  `Seat.drink_index`), `PlayerAvatar` (the artist's model from `assets/models/player/`,
   tinted per seat by vertex-colour clothing masks), keyboard, `CrtMonitor` and
   `WristChain`s. `CameraRig` glides between seat, TV and overview poses with mouse drift.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
