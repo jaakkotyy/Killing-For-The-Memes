@@ -32,7 +32,7 @@ covered by the Godot licence), emboldened. It will be replaced by an OFL Impact-
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| Player animations: seated idles, sit and drink, stand, wave and sit down | Generated with [Meshy](https://www.meshy.ai) by jaakkotyy (project owner) | Meshy's terms: paid-plan output is owned by the user; free-plan output is CC BY 4.0 and needs the credit "Animations made with Meshy (meshy.ai)". **Check which plan generated it before release.** | `Meshy_AI_Player_Model_20261106_animated_mixamo_All_animation.fbx`, kept outside the repo; retargeted onto our rig by `tools/blender/retarget_mixamo.py` | `assets/models/player/player.glb` |
+| Player animations: seated idles, sit and drink, stand, wave and sit down | Generated with [Meshy](https://www.meshy.ai) by jaakkotyy (project owner) | Owned by the project owner: generated on a paid Meshy plan, whose output belongs to the user with full commercial rights and no attribution required (free-plan output would be CC BY 4.0). Credited here anyway. | `Meshy_AI_Player_Model_20261106_animated_mixamo_All_animation.fbx`, kept outside the repo; retargeted onto our rig by `tools/blender/retarget_mixamo.py` | `assets/models/player/player.glb` |
 | Player animations: typing idle, flinch, look up | jaakkotyy (project owner) | Original work, all rights reserved | Keyed by `tools/blender/build_player.py` | `assets/models/player/player.glb` |
 
 ## Textures & images (including meme templates)
