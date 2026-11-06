@@ -173,6 +173,8 @@ func _set_view(view: View, duration: float) -> void:
 	if seat == null and view != View.OVERVIEW:
 		view = View.OVERVIEW
 	_view = view
+	if seat != null:
+		seat.avatar.set_first_person(view != View.OVERVIEW)
 	if _station != null:
 		_station.enabled = view == View.SEAT
 	_update_hint()

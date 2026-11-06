@@ -11,6 +11,9 @@ const BODY_SHADER: Shader = preload("res://src/world/player/player_body.gdshader
 const NORMAL_MAP: Texture2D = preload("res://assets/models/player/player_normal.png")
 const AO_MAP: Texture2D = preload("res://assets/models/player/player_ao.png")
 const METRICS_PATH: String = "res://assets/models/player/player_metrics.json"
+## The artist's hat, already fitted to the head in the body's rest pose (build_hat.py).
+const HAT_MODEL: PackedScene = preload("res://assets/models/player/hat.glb")
+const HAT_BONE: String = "Head"
 
 ## Godot's importer strips the "_loop" suffix of the Blender action and makes it loop.
 const ANIM_IDLE: StringName = &"seated_idle"
@@ -43,6 +46,7 @@ var _body: MeshInstance3D
 var _material: ShaderMaterial
 var _label: Label3D
 var _wrists: Dictionary = {}  # "L"/"R" -> BoneAttachment3D
+var _hat: Node3D
 
 
 ## Seated measurements exported with the model (seat height, eye position, wrists...).
@@ -99,6 +103,7 @@ func _ready() -> void:
 	add_child(_label)
 
 	_add_cuffs()
+	_add_hat()
 	_apply_look()
 	if _anim != null:
 		_anim.playback_default_blend_time = 0.25
@@ -134,6 +139,28 @@ func hold_pose(animation: StringName, time: float) -> void:
 ## Spectators (eliminated players) are drawn washed out.
 func set_spectator(enabled: bool) -> void:
 	_material.set_shader_parameter("desaturate", 0.85 if enabled else 0.0)
+
+
+## Shows or hides the hat (it follows the head through every animation).
+func set_hat_visible(on: bool) -> void:
+	if _hat != null:
+		_hat.visible = on
+
+
+func is_hat_visible() -> bool:
+	return _hat != null and _hat.visible
+
+
+## For the local player's own body while the camera is in their head: the hat brim would
+## fill the top of the view, so it only casts its shadow.
+func set_first_person(on: bool) -> void:
+	if _hat == null:
+		return
+	var mode: GeometryInstance3D.ShadowCastingSetting = (
+		GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if on
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	for mesh: Node in _hat.find_children("*", "GeometryInstance3D", true, false):
+		(mesh as GeometryInstance3D).cast_shadow = mode
 
 
 ## The wrist cuff nodes ("L"/"R"), for chains to follow.
@@ -183,3 +210,31 @@ func _add_cuffs() -> void:
 		cuff.position = Vector3(0.0, -0.035, 0.0)
 		attachment.add_child(cuff)
 		_wrists[side] = cuff
+
+
+func _add_hat() -> void:
+	var bone: int = _skeleton.find_bone(HAT_BONE)
+	if bone == -1:
+		push_error("Player model has no %s bone; the hat is skipped" % HAT_BONE)
+		return
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = HAT_BONE
+	_skeleton.add_child(attachment)
+	_hat = HAT_MODEL.instantiate()
+	_hat.name = "Hat"
+	# hat.glb is in the model's rest space; undo the bone's rest placement so it sits on the
+	# head in the rest pose and then moves with the bone.
+	var head_rest: Transform3D = _skeleton_in_model() * _skeleton.get_bone_global_rest(bone)
+	_hat.transform = head_rest.affine_inverse()
+	attachment.add_child(_hat)
+
+
+## The skeleton's transform relative to the imported model's root.
+func _skeleton_in_model() -> Transform3D:
+	var result := Transform3D.IDENTITY
+	var node: Node = _skeleton
+	while node != null and node != _model:
+		if node is Node3D:
+			result = (node as Node3D).transform * result
+		node = node.get_parent()
+	return result
