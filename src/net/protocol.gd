@@ -12,7 +12,8 @@ extends RefCounted
 ##   server → client  _rpc_join_rejected(reason: String)           # followed by a kick
 ##   server → client  _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array)
 ##                    # LobbyState.to_dict(), GameConfig.to_dict(), online template catalogue
-##                    # ([{id, name, url, width, height}], see ImgflipCatalogue; [] = originals only)
+##                    # ([{id, name, url, width, height, still_url?, animated?}], validated
+##                    # with TemplateCatalogue on arrival; [] = originals only)
 ##   client → server  _rpc_submit_meme(meme: Dictionary)           # MemeSpec.to_dict()
 ##   client → server  _rpc_cast_vote(value: int)                   # +1, -1, or 0 to take it back
 ##   client → server  _rpc_shoot()
@@ -24,7 +25,7 @@ extends RefCounted
 ##
 ## The host has no RPC round trip to itself: Session calls ServerController directly.
 
-const VERSION: int = 3
+const VERSION: int = 4
 
 const DEFAULT_PORT: int = 7777
 const MAX_PLAYERS: int = 8

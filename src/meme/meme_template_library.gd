@@ -5,13 +5,15 @@ extends RefCounted
 ## Two kinds:
 ## - Our originals, from data/meme_templates.json: images in assets/meme_templates/<id>.jpg,
 ##   rendered from the game's own room by tools/capture_templates.ps1. Always available.
-## - Online templates (popular memes from Imgflip), added at run time with set_online().
-##   Their images download in the background (TemplateImageCache); texture() returns null
-##   until then and image_updated fires when one arrives (or fails). They come first in ids().
+## - Online templates (popular stills from Imgflip, GIFs from GIPHY), added at run time with
+##   set_online(). Their images download in the background (TemplateImageCache); texture()
+##   returns null until then and image_updated fires when one arrives (or fails). They come
+##   first in ids(). Animated ones have a still (texture(), for thumbnails) and the whole
+##   GIF (animation(), decoded only when a meme on it is shown).
 ##
 ## The server uses ids() to validate submitted memes; clients use texture() to render them.
 
-## An online template's image finished downloading, or failed to (see image_failed()).
+## An online template's still or animation finished loading, or failed to.
 signal image_updated(id: String)
 
 const DEFAULT_PATH: String = "res://data/meme_templates.json"
@@ -25,7 +27,7 @@ var _original_ids: PackedStringArray = []
 var _online_ids: PackedStringArray = []
 var _names: Dictionary = {}  # id -> display name
 var _textures: Dictionary = {}  # original id -> Texture2D (loaded lazily)
-var _online: Dictionary = {}  # online id -> catalogue entry (see ImgflipCatalogue)
+var _online: Dictionary = {}  # online id -> catalogue entry (see TemplateCatalogue)
 var _cache_connected: bool = false
 
 
@@ -54,7 +56,7 @@ static func from_json(json_text: String) -> MemeTemplateLibrary:
 		var id: Variant = (entry as Dictionary).get("id")
 		var display: Variant = (entry as Dictionary).get("name", "")
 		if typeof(id) != TYPE_STRING or not MemeSpec.is_valid_template_id(id) or library._original_ids.has(id) \
-				or ImgflipCatalogue.is_online_id(id):
+				or TemplateCatalogue.is_online_id(id):
 			continue
 		library._original_ids.append(id)
 		var label: String = str(display).strip_edges().substr(0, NAME_MAX_LENGTH)
@@ -63,7 +65,7 @@ static func from_json(json_text: String) -> MemeTemplateLibrary:
 
 
 ## Replaces the online templates with [param entries] (already validated catalogue
-## entries; pass them through ImgflipCatalogue.sanitize() when they come from the network).
+## entries; pass them through TemplateCatalogue.sanitize() when they come from the network).
 func set_online(entries: Array[Dictionary]) -> void:
 	for id: String in _online_ids:
 		_names.erase(id)
@@ -115,6 +117,18 @@ func is_online(id: String) -> bool:
 	return _online.has(id)
 
 
+func is_animated(id: String) -> bool:
+	return _online.has(id) and bool((_online[id] as Dictionary).get("animated", false))
+
+
+## True when any online template is a GIF (the editor then credits GIPHY).
+func has_animated() -> bool:
+	for id: String in _online_ids:
+		if is_animated(id):
+			return true
+	return false
+
+
 func display_name(id: String) -> String:
 	return _names.get(id, id)
 
@@ -135,7 +149,7 @@ static func image_path(id: String) -> String:
 func texture(id: String) -> Texture2D:
 	if _online.has(id):
 		_connect_cache()
-		return TemplateImageCache.get_instance().get_texture(_online[id]["url"])
+		return TemplateImageCache.get_instance().get_texture(_still_url(id))
 	if not _original_ids.has(id):
 		return null
 	if not _textures.has(id):
@@ -144,9 +158,22 @@ func texture(id: String) -> Texture2D:
 	return _textures[id]
 
 
-## True when an online template's image could not be downloaded.
+## The decoded GIF of an animated template, or null while it loads (or for stills).
+func animation(id: String) -> AnimatedTemplate:
+	if not is_animated(id):
+		return null
+	_connect_cache()
+	return TemplateImageCache.get_instance().get_animation(_online[id]["url"])
+
+
+## True when an online template's still could not be loaded.
 func image_failed(id: String) -> bool:
-	return _online.has(id) and TemplateImageCache.get_instance().has_failed(_online[id]["url"])
+	return _online.has(id) and TemplateImageCache.get_instance().has_failed(_still_url(id))
+
+
+func _still_url(id: String) -> String:
+	var entry: Dictionary = _online[id]
+	return entry.get("still_url", entry["url"])
 
 
 func _connect_cache() -> void:
@@ -157,13 +184,20 @@ func _connect_cache() -> void:
 	# Named methods, not lambdas: Godot drops these connections when the library is freed.
 	cache.loaded.connect(_on_image_loaded)
 	cache.failed.connect(_on_image_updated)
+	cache.animation_loaded.connect(_on_animation_loaded)
+	cache.animation_failed.connect(_on_image_updated)
 
 
 func _on_image_loaded(url: String, _texture: Texture2D) -> void:
 	_on_image_updated(url)
 
 
+func _on_animation_loaded(url: String, _animation: AnimatedTemplate) -> void:
+	_on_image_updated(url)
+
+
 func _on_image_updated(url: String) -> void:
 	for id: String in _online_ids:
-		if _online[id]["url"] == url:
+		var entry: Dictionary = _online[id]
+		if entry["url"] == url or entry.get("still_url", "") == url:
 			image_updated.emit(id)

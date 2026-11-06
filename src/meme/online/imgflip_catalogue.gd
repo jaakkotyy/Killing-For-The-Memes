@@ -57,7 +57,7 @@ static func sanitize(entries: Variant, limit: int = MAX_ENTRIES) -> Array[Dictio
 	for entry: Variant in entries:
 		if result.size() >= mini(limit, MAX_ENTRIES):
 			break
-		var clean: Dictionary = _sanitize_entry(entry)
+		var clean: Dictionary = sanitize_entry(entry)
 		if clean.is_empty() or seen.has(clean["id"]):
 			continue
 		seen[clean["id"]] = true
@@ -73,7 +73,8 @@ static func is_online_id(id: String) -> bool:
 	return id.begins_with(ID_PREFIX)
 
 
-static func _sanitize_entry(entry: Variant) -> Dictionary:
+## One entry from an untrusted source, or {} if it is not acceptable.
+static func sanitize_entry(entry: Variant) -> Dictionary:
 	if not entry is Dictionary:
 		return {}
 	var e: Dictionary = entry

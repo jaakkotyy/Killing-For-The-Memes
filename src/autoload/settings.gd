@@ -9,6 +9,9 @@ var host_port: int = Protocol.DEFAULT_PORT
 var last_join_target: String = ""
 ## Host: offer popular meme templates from imgflip.com besides our own.
 var online_templates: bool = true
+## Host: your own GIPHY API key, for GIF templates (https://developers.giphy.com). Kept in
+## user://settings.cfg on this machine only; the GIPHY_API_KEY environment variable wins.
+var giphy_api_key: String = ""
 
 
 func _ready() -> void:
@@ -23,6 +26,13 @@ func load_settings() -> void:
 	host_port = int(config.get_value(_SECTION, "host_port", host_port))
 	last_join_target = str(config.get_value(_SECTION, "last_join_target", last_join_target))
 	online_templates = bool(config.get_value(_SECTION, "online_templates", online_templates))
+	giphy_api_key = str(config.get_value(_SECTION, "giphy_api_key", giphy_api_key)).strip_edges()
+
+
+## The key to use for GIPHY ("" = no GIF templates). Never print it.
+func get_giphy_api_key() -> String:
+	var from_env: String = OS.get_environment("GIPHY_API_KEY").strip_edges()
+	return from_env if not from_env.is_empty() else giphy_api_key
 
 
 func save_settings() -> void:
@@ -31,6 +41,8 @@ func save_settings() -> void:
 	config.set_value(_SECTION, "host_port", host_port)
 	config.set_value(_SECTION, "last_join_target", last_join_target)
 	config.set_value(_SECTION, "online_templates", online_templates)
+	if not giphy_api_key.is_empty():
+		config.set_value(_SECTION, "giphy_api_key", giphy_api_key)
 	var err: Error = config.save(_PATH)
 	if err != OK:
 		push_warning("Could not save settings: %s" % error_string(err))

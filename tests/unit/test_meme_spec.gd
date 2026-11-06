@@ -14,6 +14,8 @@ func test_rejects_malformed_input() -> void:
 	assert_null(MemeSpec.from_untrusted({"template_id": ""}))
 	assert_null(MemeSpec.from_untrusted({"template_id": "../../etc/passwd"}))
 	assert_null(MemeSpec.from_untrusted({"template_id": "Has Spaces"}))
+	assert_null(MemeSpec.from_untrusted({"template_id": "giphy-abc/def"}))
+	assert_not_null(MemeSpec.from_untrusted({"template_id": "giphy-3o7TKSjRrfIPjeiVyM"}), "GIPHY ids are mixed case")
 
 
 func test_enforces_allowed_templates() -> void:

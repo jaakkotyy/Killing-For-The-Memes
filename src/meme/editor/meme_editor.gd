@@ -154,12 +154,21 @@ func _fill_templates() -> void:
 	_template_list.clear()
 	_template_list.fixed_icon_size = THUMB_SIZE
 	for id: String in library.ids():
-		_template_list.add_item(library.display_name(id), library.texture(id))
+		var label: String = library.display_name(id)
+		_template_list.add_item(tr("GIF: %s") % label if library.is_animated(id) else label, library.texture(id))
 	if library.size() > 0:
 		select_template(library.ids()[0])
-	if library.has_online():
-		# Popular templates are other people's images; say where they come from.
-		_hint.text += "   ·   " + tr("Popular templates via imgflip.com")
+	# Online templates are other people's images; say where they come from. GIPHY's terms
+	# require "Powered by GIPHY" wherever its results are shown.
+	var credits: PackedStringArray = []
+	for id: String in library.ids():
+		if ImgflipCatalogue.is_online_id(id) and library.is_online(id):
+			credits.append(tr("Popular templates via imgflip.com"))
+			break
+	if library.has_animated():
+		credits.append(tr("Powered by GIPHY"))
+	if not credits.is_empty():
+		_hint.text += "   ·   " + "   ·   ".join(credits)
 
 
 func _on_image_updated(id: String) -> void:

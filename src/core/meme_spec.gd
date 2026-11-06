@@ -4,8 +4,9 @@ extends RefCounted
 ## every client renders it locally, so no images are ever sent.
 
 const CAPTION_MAX_LENGTH: int = 80
-## Template ids are short slugs, e.g. "sad_clown" or "office_fire_02".
-const _TEMPLATE_ID_PATTERN: String = "^[a-z0-9_-]{1,40}$"
+## Template ids are short slugs, e.g. "sad_clown", "imgflip-181913649" or (GIPHY ids are
+## case-sensitive) "giphy-3o7TKSjRrfIPjeiVyM".
+const _TEMPLATE_ID_PATTERN: String = "^[A-Za-z0-9_-]{1,40}$"
 
 var template_id: String = ""
 var top_text: String = ""
@@ -46,7 +47,7 @@ static func from_untrusted(data: Variant, allowed_templates: PackedStringArray =
 	return MemeSpec.new(template_text, sanitize_caption(dict.get("top_text", "")), sanitize_caption(dict.get("bottom_text", "")))
 
 
-## True for a well-formed template id (a short lowercase slug).
+## True for a well-formed template id (a short slug of letters, digits, _ and -).
 static func is_valid_template_id(id: String) -> bool:
 	return RegEx.create_from_string(_TEMPLATE_ID_PATTERN).search(id) != null
 

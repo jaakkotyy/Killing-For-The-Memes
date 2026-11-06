@@ -109,6 +109,7 @@ func _offer_online_templates() -> void:
 		_template_source.name = "OnlineTemplateSource"
 		add_child(_template_source)
 		_template_source.fetched.connect(_on_templates_fetched)
+		_template_source.giphy_api_key = Settings.get_giphy_api_key()
 	# An auto-started test game waits for the catalogue (the fetch gives up after a few seconds).
 	Session.auto_start = false
 	_template_source.fetch()
@@ -133,7 +134,7 @@ func _apply_online_templates(entries: Array[Dictionary]) -> void:
 
 func _on_game_started() -> void:
 	# Everyone, host included, uses exactly the catalogue the host sent for this game.
-	MemeTemplateLibrary.get_default().set_online(ImgflipCatalogue.sanitize(Session.match_templates))
+	MemeTemplateLibrary.get_default().set_online(TemplateCatalogue.sanitize(Session.match_templates))
 	get_tree().change_scene_to_file(ROOM_SCENE)
 	if options.smoke_test:
 		_smoke_game_started = true
