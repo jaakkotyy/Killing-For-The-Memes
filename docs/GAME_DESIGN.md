@@ -61,17 +61,42 @@ Name: TBD (placeholder: "The Host").
   picks at random (server RNG, announced dramatically).
 - **Eliminated players** (MVP) stay as spectators who can still 👍/👎 vote, but cannot shoot.
   This keeps the final 1v1 decidable. Full "ghost" mechanics come later.
+  (`GameConfig.eliminated_can_vote` turns this off.)
+- Elimination order of rules: non-submitters → lowest score → most bullets taken → random.
+  The reason is sent to clients so the host can announce *why* someone died.
+
+## Round flow details (implemented in `src/core/game_match.gd`)
+
+- **Creation ends early** as soon as every living player has submitted. Players may
+  resubmit (replace their meme) until creation ends.
+- **Spotlight order** is shuffled every round. Every player alive when creation ended gets
+  exactly one spotlight, including non-submitters, who are shown a blank meme.
+- **Votes are secret** until the elimination results; each player only sees their own vote.
+  **Shots are public** the moment they happen.
+- **Results**: during the elimination phase everyone sees each player's score,
+  👍/👎 counts, bullets taken and whether they submitted.
+- **The final death** still gets its full elimination phase before the win screen.
+- **Timers** always run from the moment a phase starts, so a server hitch never cuts the
+  next phase short. Snapshots send `time_left`, not absolute times, so client clocks don't matter.
+- **Hidden information**: clients never receive other players' memes before their spotlight
+  or other players' votes, so a modified client can't peek.
+- Clients should auto-submit their current draft just before creation ends (M5), so
+  forgetting to press "Done" doesn't count as no submission.
 
 ## Default timings (tunable)
 
-- Prompt announcement: ~5 s
-- Meme creation: 75 s
+- Prompt announcement: 5 s
+- Meme creation: 75 s (or until everyone submits)
 - Spotlight per meme: 12 s
-- Elimination sequence: ~6 s
+- Elimination sequence: 6 s
 
 ## Disconnects
 
-- A player who disconnects mid-game is treated as eliminated (dramatic "walked out" death).
+- A player who disconnects mid-game is out for good ("walked out"). They are skipped in
+  the spotlight, and their bullets and seat are gone.
+- Walking out does **not** count as the round's death: the worst meme still dies.
+- If their spotlight was on, the next spotlight starts immediately with full time.
+- If only one player is left alive, that player wins at once.
 - If the host (server) disconnects, the game ends for everyone and clients return to the menu.
 - No late joining once a game has started.
 

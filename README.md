@@ -7,7 +7,8 @@ shoots), and the author of the worst meme dies a ridiculous cartoon death. Last 
 Built with **Godot 4.7.2** (GDScript). Windows first; Linux/macOS later. Designed so Steam
 integration (GodotSteam) can be added without rewriting the game.
 
-> Status: **M1 — networking skeleton** (menu, host/join, lobby). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
+> Status: **M2 — core rules** (menu, host/join, lobby; round rules implemented and tested,
+> not yet playable on screen). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
 > design and [CLAUDE.md](CLAUDE.md) for architecture and conventions.
 
 ## Requirements

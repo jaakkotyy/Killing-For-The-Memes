@@ -63,9 +63,18 @@ core/                     pure rules: RefCounted classes, no Nodes, no networkin
 
 Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 
-- **`src/core/`** — game rules as plain `RefCounted` classes: round state machine, scoring,
-  player state, `MemeSpec`. Deterministic given inputs (inject RNG/seed). Fully unit-tested.
-  Never references `multiplayer`, nodes or UI.
+- **`src/core/`** — game rules as plain `RefCounted` classes. Deterministic given inputs
+  (inject RNG/seed, pass `now` in). Fully unit-tested. Never references `multiplayer`,
+  nodes or UI.
+  - `GameMatch`: the round state machine (WAITING → PROMPT → CREATE → SPOTLIGHT×n →
+    ELIMINATION → … → GAME_OVER). The server calls `update(now)` every frame and the intent
+    methods (`submit_meme`, `cast_vote`, `shoot`, `remove_player`), which take untrusted
+    `Variant` input and return an `IntentResult`. `to_snapshot(now, viewer_id)` is the
+    per-player view with hidden information removed; never send anything else to clients.
+  - `Scoring`: score formula and elimination choice. `GameConfig` (Resource): all tunables.
+  - `MemeSpec`, `PlayerState`, `PromptDeck` (packs in `data/prompts/*.json`), `LobbyState`.
+  - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
+    seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`
   (stub) later. A transport only creates a Godot `MultiplayerPeer` (reported through the
   `peer_ready`/`failed` signals, because Steam lobby creation is async) and reports join info.
@@ -122,7 +131,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - [x] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up,
   join rejection (version/full/started/timeout), local multi-instance + smoke test scripts.
   The room scene (`src/world/room/`) is still a 2D placeholder.
-- [ ] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win
+- [x] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win,
+  disconnects, per-player snapshots, default prompt pack. Not wired to the network yet (M5).
 - [ ] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig
 - [ ] **M4** Meme editor + CRT zoom transition
 - [ ] **M5** Full round loop wired end to end, win screen
@@ -141,3 +151,7 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   peer connect and then silently ignores it, so the client hangs. Let late joiners connect;
   `ServerController` rejects them with a readable reason and Session kicks them.
 - The host never needs to "ready up"; pressing Start is its readiness.
+- Use `JSON.new().parse()`, not `JSON.parse_string()`, for untrusted JSON: the latter logs an
+  engine error on bad input, and GUT fails tests on unexpected engine errors.
+- `Array.filter()`/`map()` return untyped arrays: `assign()` them into `Array[int]` etc.
+  instead of assigning directly, which fails at runtime.

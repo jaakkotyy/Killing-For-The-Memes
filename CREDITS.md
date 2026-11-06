@@ -37,5 +37,5 @@ permitted (e.g. CC0, CC-BY, OFL, MIT). Record attribution text exactly as the li
 
 ## Original work
 
-Everything not listed above (code, `icon.svg`, scenes, prompts, the host character) is
-original work created for this project.
+Everything not listed above (code, `icon.svg`, scenes, the prompt packs in `data/prompts/`,
+the host character) is original work created for this project.
