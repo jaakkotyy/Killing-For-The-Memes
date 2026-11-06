@@ -12,6 +12,8 @@ extends RefCounted
 ##   --auto-start         (host) start as soon as the lobby allows it
 ##   --min-players=<n>    override the minimum player count (debug builds only)
 ##   --smoke-test         quit with exit code 0 once the game starts, non-zero on failure
+##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
+##   --room-camera=<view> first room camera: seat (default), tv or overview
 
 var host: bool = false
 var join_target: String = ""
@@ -22,6 +24,12 @@ var auto_start: bool = false
 ## 0 means "not set".
 var min_players: int = 0
 var smoke_test: bool = false
+## 0 means "not set"; otherwise the number of fake players in the room preview.
+var room_preview: int = 0
+## "" (seat), "seat", "tv" or "overview".
+var room_camera: String = ""
+
+const ROOM_CAMERAS: PackedStringArray = ["seat", "tv", "overview"]
 
 
 static func parse(args: PackedStringArray) -> LaunchOptions:
@@ -52,4 +60,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					options.min_players = clampi(value.to_int(), 1, Protocol.MAX_PLAYERS)
 			"--smoke-test":
 				options.smoke_test = true
+			"--room-preview":
+				if value.is_valid_int():
+					options.room_preview = clampi(value.to_int(), 1, Protocol.MAX_PLAYERS)
+			"--room-camera":
+				if value in ROOM_CAMERAS:
+					options.room_camera = value
 	return options

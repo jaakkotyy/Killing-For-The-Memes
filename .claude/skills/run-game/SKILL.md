@@ -21,6 +21,7 @@ plain `.exe` for windows the user will look at.
 | Reproduce a specific scenario (late joiner, bad address, timing) | 2. Custom headless run |
 | The user wants to see or play it | 3. Windowed instances + capture |
 | Screenshot one screen without disturbing the user's desktop | 4. Offscreen frames |
+| Look at the 3D room, characters, lighting | 5. Room preview |
 
 ### 1. Smoke test (automated, about 10 s)
 
@@ -51,7 +52,8 @@ Add `--smoke-test` to an instance to make it exit with 0 on game start and 1 on 
 and print the failure reason (for example a join rejection message).
 
 Launch flags (after `--`): `--host`, `--join=<ip|ip:port|code>`, `--name=`, `--port=`,
-`--auto-ready`, `--auto-start`, `--min-players=<n>` (debug builds), `--smoke-test`.
+`--auto-ready`, `--auto-start`, `--min-players=<n>` (debug builds), `--smoke-test`,
+`--room-preview=<n>`, `--room-camera=seat|tv|overview`.
 The source of truth is `src/util/launch_options.gd`.
 
 ### 3. Windowed instances for the user
@@ -79,6 +81,23 @@ Get-Process | Where-Object { $_.MainWindowTitle -like "Killing for the Memes*" }
 
 This writes `f00000000.png` ... `f00000059.png`; read the last one. A window still opens
 briefly. Pair it with headless peers (mode 2) to capture, for example, a populated lobby.
+Write the movie path with **forward slashes** (`C:/Users/.../f.png`); a mangled path makes
+Godot log `Condition "d.is_null()"` and write nothing.
+
+### 5. Room preview (3D room, no network)
+
+```bash
+"$G" --path . --resolution 1280x720 --write-movie "C:/<scratchpad>/room/f.png" --quit-after 220 -- --room-preview=8 --room-camera=overview
+```
+
+Opens the room with n fake players (local player = seat 1, "You"). The spotlight hops to
+the next player 0.5 s after start and then every 3 s, and that player flinches, so frame
+~40 shows a flinch and a lit player. Correct frames: everyone seated with hands on the
+keyboards, distinct shirt colours, name tags, glowing CRTs, the host with a green pixel
+face beside the TV. `--room-camera=seat` shows your own CRT with static, `tv` the wall TV
+reading "KILLING FOR THE MEMES". Mouse look is off while recording a movie.
+In a debug window: Tab cycles cameras, F flinches someone, G moves the spotlight.
+The models come from the `blender-pipeline` skill.
 
 ## Pitfalls (all hit in practice)
 

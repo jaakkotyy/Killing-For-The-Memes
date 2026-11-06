@@ -44,7 +44,9 @@ func consume_message() -> String:
 
 func _run_launch_action() -> void:
 	var player_name: String = options.player_name if not options.player_name.is_empty() else Settings.player_name
-	if options.host:
+	if options.room_preview > 0:
+		get_tree().change_scene_to_file(ROOM_SCENE)
+	elif options.host:
 		Session.host_game(player_name, options.port)
 	elif not options.join_target.is_empty():
 		Session.join_game(options.join_target, player_name)

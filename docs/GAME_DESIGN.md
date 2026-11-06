@@ -33,6 +33,17 @@ Name: TBD (placeholder: "The Host").
 - During judging the camera pulls back; the meme is shown on a big wall TV while a
   spotlight focuses on the presenting player.
 
+## The room (M3 greybox)
+
+- Round table; seats spread evenly over a 250° arc facing the centre, leaving the side
+  toward the wall TV open. The host stands in that gap beside the TV.
+- Each seat: wooden chair, the player chained by both wrists to bolts in the table, a
+  keyboard under their hands and a CRT monitor in front of them.
+- One flickering lamp over the table, a ceiling spotlight for the presenting player,
+  light fog. Everyone wears a different shirt colour so players are easy to tell apart.
+- Camera: first-person from your own seat (looking at your monitor, gentle mouse drift),
+  a TV view and an overview.
+
 ## Core round loop (MVP)
 
 1. **Prompt** — the host announces a prompt (from the active prompt pack).

@@ -21,7 +21,7 @@ permitted (e.g. CC0, CC-BY, OFL, MIT). Record attribution text exactly as the li
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| _none yet_ | | | | |
+| Player character (sculpt, low-poly body, UVs) | jaakkotyy (project owner) | Original work, all rights reserved | Own Blender source, kept outside the repo | `assets/models/player/` |
 
 ## Textures & images (including meme templates)
 
@@ -38,4 +38,5 @@ permitted (e.g. CC0, CC-BY, OFL, MIT). Record attribution text exactly as the li
 ## Original work
 
 Everything not listed above (code, `icon.svg`, scenes, the prompt packs in `data/prompts/`,
-the host character) is original work created for this project.
+the host character, the rig, animations and baked maps of the player character) is original
+work created for this project. The room's surfaces use Godot's procedural noise, not image textures.

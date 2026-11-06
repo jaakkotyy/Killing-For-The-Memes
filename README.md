@@ -7,8 +7,8 @@ shoots), and the author of the worst meme dies a ridiculous cartoon death. Last 
 Built with **Godot 4.7.2** (GDScript). Windows first; Linux/macOS later. Designed so Steam
 integration (GodotSteam) can be added without rewriting the game.
 
-> Status: **M2 — core rules** (menu, host/join, lobby; round rules implemented and tested,
-> not yet playable on screen). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
+> Status: **M3 — 3D room** (menu, host/join, lobby, round rules tested; the 3D room with
+> seated players, CRTs, wall TV and host; memes and the round loop arrive in M4/M5). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
 > design and [CLAUDE.md](CLAUDE.md) for architecture and conventions.
 
 ## Requirements
@@ -48,6 +48,27 @@ You can also run them inside the editor from the **GUT** bottom panel.
 
 Output: `builds/windows/KillingForTheMemes.exe` (single file, game data embedded).
 Or in the editor: *Project → Export… → Windows Desktop*.
+
+## Previewing the 3D room
+
+Open the room directly with fake players, no network needed (the spotlight hops between
+players, who flinch):
+
+```powershell
+& $env:GODOT --path . -- --room-preview=8                       # first-person seat view
+& $env:GODOT --path . -- --room-preview=8 --room-camera=overview # or tv
+```
+
+In debug builds: **Tab** cycles the camera, **F** makes someone flinch, **G** moves the spotlight.
+
+## Character models
+
+The player character comes from our own Blender files, kept outside the repo. To rebuild
+`assets/models/player/` after changing them, see [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md):
+
+```powershell
+.	oolsuild_models.ps1
+```
 
 ## Testing multiplayer locally
 
@@ -89,6 +110,8 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--auto-start` | Host starts as soon as everyone is ready |
 | `--min-players=<n>` | Lower the 3-player minimum (debug builds only) |
 | `--smoke-test` | Exit 0 once the game starts, non-zero on failure |
+| `--room-preview=<n>` | Open the 3D room directly with n fake players (no network) |
+| `--room-camera=<view>` | First room camera: `seat` (default), `tv` or `overview` |
 
 ## Playing over the internet (before Steam)
 
@@ -119,7 +142,8 @@ src/
   activities/  modular "while you wait" activities (post-MVP)
   ui/          menus, lobby, HUD, voting, win screen
 tests/unit/    GUT unit tests
-tools/         PowerShell helper scripts (tests, build, local multiplayer, smoke test)
+tools/         PowerShell helper scripts (tests, build, local multiplayer, smoke test, models)
+tools/blender/ Blender export scripts (run headless by tools/build_models.ps1)
 ```
 
 ## Credits
