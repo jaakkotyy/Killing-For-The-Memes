@@ -21,15 +21,29 @@ if (-not (Test-Path $GodotGui)) { $GodotGui = $Godot }
 
 & $Godot --headless --path $ProjectRoot --import | Out-Null
 
-# Tile windows: 2 columns for up to 4 instances, 4 columns for more.
+# Tile windows on the primary monitor's work area: 2 columns for up to 4 instances, 4 for more.
+# Godot's --position counts from the top-left of the whole virtual desktop (all monitors),
+# so offset by where the primary monitor sits inside it.
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type 'using System.Runtime.InteropServices; public static class KftmDpi { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }'
+[KftmDpi]::SetProcessDPIAware() | Out-Null
+$Work = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$Virtual = [System.Windows.Forms.SystemInformation]::VirtualScreen
+$OriginX = $Work.X - $Virtual.X
+$OriginY = $Work.Y - $Virtual.Y
+
+$TitleBar = 40   # Approximate window frame + title bar height.
 $Total = $Clients + 1
 $Columns = if ($Total -le 4) { 2 } else { 4 }
-$Width = [int](1920 / $Columns)
-$Height = [int]($Width * 9 / 16)
+$Rows = [math]::Ceiling($Total / $Columns)
+$CellWidth = [int]($Work.Width / $Columns)
+$CellHeight = [int]($Work.Height / $Rows)
+$Height = [int][math]::Min(($CellWidth - 16) * 9 / 16, $CellHeight - $TitleBar)
+$Width = [int]($Height * 16 / 9)
 
 function Start-Instance([int]$Index, [string[]]$GameArgs) {
-    $x = ($Index % $Columns) * $Width
-    $y = [math]::Floor($Index / $Columns) * ($Height + 32)
+    $x = $OriginX + ($Index % $Columns) * $CellWidth
+    $y = $OriginY + [math]::Floor($Index / $Columns) * $CellHeight + $TitleBar
     $allArgs = @("--path", "`"$ProjectRoot`"", "--position", "$x,$y", "--resolution", "${Width}x${Height}", "--") + $GameArgs
     Start-Process -FilePath $GodotGui -ArgumentList $allArgs | Out-Null
 }
