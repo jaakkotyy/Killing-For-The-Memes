@@ -37,8 +37,8 @@ func _on_match_updated(view: MatchView, _previous: MatchView) -> void:
 
 
 func _submit(round_number: int) -> void:
-	var ids: PackedStringArray = Session.allowed_templates if not Session.allowed_templates.is_empty() \
-		else MemeTemplateLibrary.get_default().ids()
+	# The library holds exactly this game's templates (originals plus the host's online ones).
+	var ids: PackedStringArray = MemeTemplateLibrary.get_default().ids()
 	var spec := MemeSpec.new(ids[_rng.randi_range(0, ids.size() - 1)],
 		"BOT MEME %d" % round_number, "BEEP BOOP")
 	print("[AutoPlayer] Submitting %s" % spec.template_id)

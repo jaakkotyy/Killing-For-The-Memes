@@ -5,22 +5,29 @@
 # -FullGame plays a whole match instead: every instance is a bot (--auto-play) on short
 # timers (--fast-rounds), and each must see GAME_OVER with a winner.
 #
-# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7]
+# Popular online templates are off by default so the test never depends on the internet;
+# -Online makes the host fetch them from Imgflip and every client download the images.
+#
+# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7] [-Online]
 
 param(
     [ValidateRange(1, 7)][int]$Clients = 2,
     [int]$Port = 7790,
     [int]$TimeoutSeconds = 0,
     [switch]$FullGame,
-    [int]$Seed = 7
+    [int]$Seed = 7,
+    [switch]$Online
 )
 
 if ($TimeoutSeconds -le 0) { $TimeoutSeconds = if ($FullGame) { 150 } else { 45 } }
-$SmokeArgs = if ($FullGame) {
-    @("--smoke-test=game", "--auto-play", "--fast-rounds", "--seed=$Seed")
+# @(...) around the if: PowerShell unwraps a one-item array returned from it into a string,
+# and += would then glue the next flag onto it.
+$SmokeArgs = @(if ($FullGame) {
+    "--smoke-test=game", "--auto-play", "--fast-rounds", "--seed=$Seed"
 } else {
-    @("--smoke-test")
-}
+    "--smoke-test"
+})
+if (-not $Online) { $SmokeArgs += "--offline-templates" }
 
 . "$PSScriptRoot\godot_path.ps1"
 

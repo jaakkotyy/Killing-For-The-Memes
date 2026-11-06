@@ -21,7 +21,11 @@ var options: LaunchOptions
 ## Message for the main menu (e.g. why we were disconnected), consumed when read.
 var _pending_message: String = ""
 var _smoke_game_started: bool = false
+var _smoke_game_over: String = ""
 var _smoke_finished: bool = false
+var _template_source: OnlineTemplateSource
+## The host's popular templates, once fetched (kept for later games in this run).
+var _online_entries: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -70,6 +74,9 @@ func consume_message() -> String:
 func _run_launch_action() -> void:
 	var player_name: String = options.player_name if not options.player_name.is_empty() else Settings.player_name
 	if options.room_preview > 0:
+		# The preview never goes online, but shows the popular templates saved last time.
+		if _online_templates_wanted():
+			MemeTemplateLibrary.get_default().set_online(OnlineTemplateSource.load_cached())
 		get_tree().change_scene_to_file(ROOM_SCENE)
 	elif options.host:
 		Session.host_game(player_name, options.port)
@@ -81,9 +88,52 @@ func _on_lobby_entered() -> void:
 	get_tree().change_scene_to_file(LOBBY_SCENE)
 	if options.auto_ready and not Session.is_host():
 		Session.set_ready(true)
+	if Session.is_host():
+		_offer_online_templates()
+
+
+## Host: fetch popular templates once per run (in the background, while people join) and
+## offer them in the next game. Our originals are always offered too.
+func _online_templates_wanted() -> bool:
+	return Settings.online_templates and not options.offline_templates
+
+
+func _offer_online_templates() -> void:
+	if not _online_templates_wanted():
+		return
+	if not _online_entries.is_empty():
+		_apply_online_templates(_online_entries)
+		return
+	if _template_source == null:
+		_template_source = OnlineTemplateSource.new()
+		_template_source.name = "OnlineTemplateSource"
+		add_child(_template_source)
+		_template_source.fetched.connect(_on_templates_fetched)
+	# An auto-started test game waits for the catalogue (the fetch gives up after a few seconds).
+	Session.auto_start = false
+	_template_source.fetch()
+
+
+func _on_templates_fetched(entries: Array[Dictionary]) -> void:
+	_online_entries = entries
+	if Session.is_host():
+		_apply_online_templates(entries)
+	Session.auto_start = options.auto_start
+	if options.auto_start:
+		Session.request_start()
+
+
+func _apply_online_templates(entries: Array[Dictionary]) -> void:
+	var library: MemeTemplateLibrary = MemeTemplateLibrary.get_default()
+	if Session.lobby.started:
+		return  # Arrived too late for this game; offered in the next one.
+	library.set_online(entries)
+	Session.set_template_catalogue(entries, library.ids())
 
 
 func _on_game_started() -> void:
+	# Everyone, host included, uses exactly the catalogue the host sent for this game.
+	MemeTemplateLibrary.get_default().set_online(ImgflipCatalogue.sanitize(Session.match_templates))
 	get_tree().change_scene_to_file(ROOM_SCENE)
 	if options.smoke_test:
 		_smoke_game_started = true
@@ -96,8 +146,8 @@ func _on_match_updated(view: MatchView, previous: MatchView) -> void:
 		return
 	if previous == null or previous.phase != GameMatch.Phase.GAME_OVER:
 		var winner: String = view.player_name(view.winner_id) if view.winner_id != 0 else "nobody"
-		get_tree().create_timer(_SMOKE_TEST_LINGER).timeout.connect(
-			_finish_smoke_test.bind(0, "game over after %d rounds, winner %s" % [view.round_number, winner]))
+		_smoke_game_over = "game over after %d rounds, winner %s" % [view.round_number, winner]
+		get_tree().create_timer(_SMOKE_TEST_LINGER).timeout.connect(_finish_smoke_test.bind(0, _smoke_game_over))
 
 
 func _on_returned_to_lobby() -> void:
@@ -112,7 +162,11 @@ func _on_session_ended(reason: String) -> void:
 		if not _smoke_game_started:
 			_finish_smoke_test(1, "session ended before the game started: %s" % reason)
 		elif options.smoke_test_full_game:
-			_finish_smoke_test(1, "session ended before the game was over: %s" % reason)
+			# The host may quit first once everyone has seen the end; that still counts.
+			if not _smoke_game_over.is_empty():
+				_finish_smoke_test(0, _smoke_game_over)
+			else:
+				_finish_smoke_test(1, "session ended before the game was over: %s" % reason)
 		return
 	_pending_message = reason
 	get_tree().change_scene_to_file(MAIN_MENU_SCENE)

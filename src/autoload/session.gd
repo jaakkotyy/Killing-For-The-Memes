@@ -33,6 +33,11 @@ var auto_start: bool = false
 var host_config: GameConfig = GameConfig.new()
 ## Host only: template ids memes may use. App fills this from the template library.
 var allowed_templates: PackedStringArray = []
+## Host only: the online template catalogue sent to everyone when a game starts.
+var template_catalogue: Array[Dictionary] = []
+## The online templates of the running game, as the host sent them (untrusted on clients:
+## validate before use). Empty outside a game or when the host has none.
+var match_templates: Array = []
 ## Host only: fixed match seed (0 = random), for reproducible test games.
 var host_seed: int = 0
 ## Latest picture of the running match; null outside a game. Treat as read-only.
@@ -94,6 +99,18 @@ func set_ready(is_ready: bool) -> void:
 		_server.handle_set_ready(multiplayer.get_unique_id(), is_ready)
 	elif Net.is_joined():
 		_rpc_set_ready.rpc_id(1, is_ready)
+
+
+## Host only, in the lobby: offer these online templates (and allow these ids) in the next
+## game. Returns false once a game is running, so a game never changes templates midway.
+func set_template_catalogue(entries: Array[Dictionary], allowed: PackedStringArray) -> bool:
+	if lobby.started:
+		return false
+	template_catalogue = entries
+	allowed_templates = allowed
+	if _server != null:
+		_server.allowed_templates = allowed
+	return true
 
 
 ## Host only. Ignored unless the lobby can start.
@@ -207,10 +224,11 @@ func _on_server_game_started(snapshot: Dictionary) -> void:
 	# New connections stay open on purpose: late joiners get a clear "already started"
 	# rejection from ServerController. (ENet's refuse_new_connections leaves them hanging.)
 	var config: Dictionary = _server.config.to_dict()
+	var templates: Array = template_catalogue.duplicate(true)
 	for player: LobbyPlayer in _server.lobby.get_players():
 		if player.id != local_peer_id():
-			_rpc_game_started.rpc_id(player.id, snapshot, config)
-	_apply_game_started(snapshot, config)
+			_rpc_game_started.rpc_id(player.id, snapshot, config, templates)
+	_apply_game_started(snapshot, config, templates)
 
 
 ## Everyone gets their own snapshot: hidden information differs per player.
@@ -281,8 +299,8 @@ func _rpc_join_rejected(reason: String) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_game_started(snapshot: Dictionary, config: Dictionary) -> void:
-	_apply_game_started(snapshot, config)
+func _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array) -> void:
+	_apply_game_started(snapshot, config, templates)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -305,9 +323,10 @@ func _apply_lobby_snapshot(snapshot: Dictionary) -> void:
 	lobby_updated.emit(lobby)
 
 
-func _apply_game_started(snapshot: Dictionary, config: Dictionary) -> void:
+func _apply_game_started(snapshot: Dictionary, config: Dictionary, templates: Array) -> void:
 	_apply_lobby_snapshot(snapshot)
 	match_config = config
+	match_templates = templates
 	match_view = null
 	print("[Session] Game started with %d players." % lobby.player_count())
 	game_started.emit()
@@ -343,6 +362,7 @@ func _reset() -> void:
 	lobby = LobbyState.new()
 	match_view = null
 	match_config = {}
+	match_templates = []
 	_in_lobby = false
 	_rejection_reason = ""
 	_timeout_check_elapsed = 0.0

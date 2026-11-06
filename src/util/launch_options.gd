@@ -16,6 +16,7 @@ extends RefCounted
 ##   --auto-play          a bot plays for you: submits memes, votes and sometimes shoots (dev)
 ##   --fast-rounds        (host) very short phases, for automated full games (debug builds only)
 ##   --seed=<n>           (host) fixed seed for prompts, spotlight order and tie-breaks
+##   --offline-templates  (host) only our original templates; don't fetch popular ones
 ##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
 ##   --room-camera=<view> first room camera: seat (default), tv, overview, or editor
 ##                        (starts zoomed into your CRT's meme editor)
@@ -35,6 +36,7 @@ var auto_play: bool = false
 var fast_rounds: bool = false
 ## 0 means "random".
 var seed_value: int = 0
+var offline_templates: bool = false
 ## 0 means "not set"; otherwise the number of fake players in the room preview.
 var room_preview: int = 0
 ## "" (seat), "seat", "tv", "overview" or "editor".
@@ -76,6 +78,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				options.auto_play = true
 			"--fast-rounds":
 				options.fast_rounds = true
+			"--offline-templates":
+				options.offline_templates = true
 			"--seed":
 				if value.is_valid_int():
 					options.seed_value = value.to_int()
