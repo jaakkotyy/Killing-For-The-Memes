@@ -24,6 +24,8 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 - GUT 9.7.1 for unit tests (`addons/gut`, dev only, excluded from exports).
 - Later: GodotSteam (GDExtension) + its `SteamMultiplayerPeer`.
 - Godot on this dev machine: `%USERPROFILE%\Tools\godot\4.7.2\` (or `$env:GODOT`).
+- Blender 2.81 at `D:\Blender\blender.exe` (or `$env:BLENDER`), headless only, for the model
+  pipeline. Model sources live outside the repo in `D:\Killing-For-The-Memes-Assets\`.
 
 ## Commands
 
@@ -32,7 +34,11 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
+.\tools\build_models.ps1 [-SkipBake] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 ```
+
+To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview]`.
+To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
 
 Run `run_tests.ps1` before every commit and `smoke_test.ps1` before merging networking
 changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
@@ -96,9 +102,18 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   with `NullPlatform` now, `SteamPlatform` later.
 - **`src/meme/`** — memes travel over the network as a small `MemeSpec` dictionary
   (template id + captions), never as images. Every client renders them locally.
-- **`src/world/`** — 3D room. The CRT screen shows a `SubViewport` that hosts the 2D meme
-  editor; the zoom transition tweens the camera to a pose where the screen fills the view,
-  then hands the same viewport to fullscreen with input (reverse on exit).
+- **`src/world/`** — 3D room. `room/room.gd` builds the greybox room in code and places one
+  `Seat` per player with `SeatLayout` (an arc that leaves the TV side open for the host).
+  A seat holds the chair, `PlayerAvatar` (the artist's model from `assets/models/player/`,
+  tinted per seat by vertex-colour clothing masks), keyboard, `CrtMonitor` and
+  `WristChain`s. `CameraRig` glides between seat, TV and overview poses with mouse drift.
+  Chair, table and camera sizes come from `player_metrics.json` written by the Blender
+  export, never from hand-tuned numbers. The room only reads Session state; M5 drives
+  `focus_spotlight()`, flinches and deaths from snapshots.
+  The CRT screen shows a `SubViewport` that hosts the 2D meme editor (M4); the zoom
+  transition tweens the camera to a pose where the screen fills the view, then hands the
+  same viewport to fullscreen with input (reverse on exit). The wall TV's picture is a
+  `SubViewport` too (`WallTv.get_picture_root()`).
 - **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
   sharing a base class, registered with the server so it can validate their intents.
 - **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).
@@ -130,10 +145,10 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - [x] **M0** Project setup: Godot project, docs, GUT, Windows export preset
 - [x] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up,
   join rejection (version/full/started/timeout), local multi-instance + smoke test scripts.
-  The room scene (`src/world/room/`) is still a 2D placeholder.
 - [x] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win,
   disconnects, per-player snapshots, default prompt pack. Not wired to the network yet (M5).
-- [ ] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig
+- [x] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig,
+  the artist's player model rigged/animated via `tools/build_models.ps1`, `--room-preview`.
 - [ ] **M4** Meme editor + CRT zoom transition
 - [ ] **M5** Full round loop wired end to end, win screen
 - [ ] **M6** Hardening (disconnects, timeouts), SFX, Windows build, playtest
@@ -155,3 +170,9 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   engine error on bad input, and GUT fails tests on unexpected engine errors.
 - `Array.filter()`/`map()` return untyped arrays: `assign()` them into `Array[int]` etc.
   instead of assigning directly, which fails at runtime.
+- Character pipeline: our Blender files are the source; a headless Blender script bakes,
+  rigs (21 bones from measured landmarks, automatic weights), animates and exports `.glb`.
+  Big `.blend` files stay out of git (GitHub's 100 MB limit). Poses are keyed in Blender,
+  not built procedurally in Godot, so they can be previewed in Cycles renders.
+- Clothing is a vertex-colour mask on the one body mesh, tinted per player in a shader,
+  instead of separate clothing meshes: one draw call per player and no clipping.
