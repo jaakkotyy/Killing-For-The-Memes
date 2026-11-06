@@ -25,7 +25,7 @@ func after_all() -> void:
 
 
 func _library_with(entries: Array[Dictionary]) -> MemeTemplateLibrary:
-	var library := MemeTemplateLibrary.from_json('{"templates": [{"id": "host_grin"}]}')
+	var library := MemeTemplateLibrary.from_json('{"templates": [{"id": "crt_static"}]}')
 	library.set_online(entries)
 	return library
 
@@ -76,7 +76,7 @@ func test_catalogue_dispatches_by_provider() -> void:
 		{"id": "giphy-Abc1", "name": "Gif", "width": 300, "height": 200},
 		{"id": "giphy-Abc1", "name": "Duplicate", "width": 300, "height": 200},
 		{"id": "tenor-1", "name": "Unknown provider", "width": 300, "height": 200},
-		{"id": "host_grin", "name": "Not online", "width": 300, "height": 200},
+		{"id": "crt_static", "name": "Not online", "width": 300, "height": 200},
 		42,
 	])
 	assert_eq(entries.size(), 2)
@@ -98,8 +98,8 @@ func test_library_knows_which_templates_move() -> void:
 	var library: MemeTemplateLibrary = _library_with(GiphyCatalogue.parse_response(SEARCH))
 	assert_true(library.has_animated())
 	assert_true(library.is_animated("giphy-3o7TKSjRrfIPjeiVyM"))
-	assert_false(library.is_animated("host_grin"))
-	assert_null(library.animation("host_grin"))
+	assert_false(library.is_animated("crt_static"))
+	assert_null(library.animation("crt_static"))
 	assert_almost_eq(library.aspect("giphy-3o7TKSjRrfIPjeiVyM"), 356.0 / 200.0, 0.0001)
 	var stills := _library_with(ImgflipCatalogue.parse_response('{"success": true, "data": {"memes": [{"id": "1", "name": "a", "url": "https://i.imgflip.com/a.jpg", "width": 100, "height": 100}]}}'))
 	assert_false(stills.has_animated())
@@ -142,7 +142,7 @@ func test_cached_gif_loads_as_still_and_animation() -> void:
 	renderer.set_meme(MemeSpec.new("giphy-GutTestGif1", "a", "b"))
 	await wait_frames(2)
 	assert_true(renderer.is_processing(), "an animated meme keeps redrawing")
-	renderer.set_meme(MemeSpec.new("host_grin", "a", "b"))
+	renderer.set_meme(MemeSpec.new("crt_static", "a", "b"))
 	await wait_frames(2)
 	assert_false(renderer.is_processing(), "a still meme does not")
 

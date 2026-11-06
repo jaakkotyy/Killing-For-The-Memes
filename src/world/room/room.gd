@@ -1,7 +1,7 @@
 class_name GameRoom
 extends Node3D
-## The 3D room: a round table with one seat per player, the wall TV, the host, a flickering
-## lamp and a spotlight. Reads players from the Session mirror and never changes game state
+## The 3D room: a round table with one seat per player, the wall TV, a flickering lamp and
+## a spotlight. Reads players from the Session mirror and never changes game state
 ## itself. In a real game a MatchPresenter drives it from match snapshots (TV, spotlight,
 ## camera, shots, deaths) and a MatchHud shows timers, voting and the win screen.
 ## The local player's MemeStation puts the meme editor on their CRT.
@@ -10,7 +10,6 @@ extends Node3D
 
 enum View { SEAT, TV, OVERVIEW }
 
-const HOST_SCENE: PackedScene = preload("res://src/world/host/the_host.tscn")
 const TV_SCENE: PackedScene = preload("res://src/world/wall_tv/wall_tv.tscn")
 const HUD_SCENE: PackedScene = preload("res://src/ui/hud/match_hud.tscn")
 
@@ -33,7 +32,6 @@ var _spotlight_player: int = 0
 var _lamp: OmniLight3D
 var _lamp_time: float = 0.0
 var _tv: WallTv
-var _host: TheHost
 var _station: MemeStation
 var _presenter: MatchPresenter
 var _match_hud: MatchHud
@@ -59,10 +57,6 @@ func _ready() -> void:
 	_tv = TV_SCENE.instantiate()
 	_tv.position = TV_POSITION
 	add_child(_tv)
-	_host = HOST_SCENE.instantiate()
-	_host.position = Vector3(-2.0, 0.0, -3.5)
-	add_child(_host)
-	_host.look_at(Vector3(0.0, 0.0, 0.0), Vector3.UP, true)
 
 	var players: Array[LobbyPlayer] = _players()
 	_build_seats(players)
@@ -130,7 +124,6 @@ func _demo_step() -> void:
 	var next: int = (ids.find(_spotlight_player) + 1) % ids.size()
 	focus_spotlight(ids[next])
 	(_seats[ids[next]] as Seat).avatar.flinch()
-	_host.set_expression([&"grin", &"surprised", &"sinister"][next % 3])
 
 
 ## Points the spotlight at a player (0 turns it off). Used by the round loop in M5.
@@ -177,10 +170,6 @@ func set_editing_allowed(allowed: bool) -> void:
 		if not allowed and _station.is_open():
 			_station.close()
 	_update_hint()
-
-
-func get_host() -> TheHost:
-	return _host
 
 
 func get_tv() -> WallTv:

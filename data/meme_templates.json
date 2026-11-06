@@ -2,9 +2,6 @@
 	"version": 1,
 	"note": "Original templates rendered from the game's own room by tools/capture_templates.ps1. Images live in assets/meme_templates/<id>.jpg.",
 	"templates": [
-		{"id": "host_grin", "name": "The Host Approves"},
-		{"id": "host_sinister", "name": "The Host Has a Plan"},
-		{"id": "host_shocked", "name": "The Host Is Shocked"},
 		{"id": "spotlight_flinch", "name": "Caught in the Spotlight"},
 		{"id": "staring_at_tv", "name": "Staring at the Screen"},
 		{"id": "empty_chair", "name": "Someone Left Early"},

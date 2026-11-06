@@ -33,7 +33,7 @@ func test_unknown_template_has_no_texture() -> void:
 
 func test_every_default_template_has_an_image() -> void:
 	var library: MemeTemplateLibrary = MemeTemplateLibrary.get_default()
-	assert_gt(library.size(), 5, "a decent choice of templates")
+	assert_gte(library.size(), 5, "a decent choice of templates")
 	for id: String in library.ids():
 		assert_not_null(library.texture(id), "image for %s" % id)
 

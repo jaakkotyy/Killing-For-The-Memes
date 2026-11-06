@@ -1,7 +1,7 @@
 class_name MatchPresenter
 extends Node
 ## Turns match snapshots into what happens in the room: the wall TV, the spotlight, the
-## camera, the host's face, the meme station, shots and deaths. It only reads MatchViews
+## camera, the meme station, shots and deaths. It only reads MatchViews
 ## (Session.match_updated) and calls room methods; game state never changes here.
 ##
 ## Everything is derived by comparing the new view with the previous one, so a client that
@@ -53,7 +53,6 @@ func apply(view: MatchView, previous: MatchView) -> void:
 func _enter_prompt(view: MatchView) -> void:
 	_lock_editor()
 	_room.focus_spotlight(0)
-	_host().set_expression(&"grin")
 	_tv().show_caption(tr("ROUND %d") % view.round_number, view.prompt)
 	_everyone_idle(view)
 	_room.set_view(GameRoom.View.TV)
@@ -84,7 +83,6 @@ func _enter_spotlight(view: MatchView) -> void:
 	var target: int = view.spotlight_id
 	_room.focus_spotlight(target)
 	_tv().show_meme(view.spotlight_meme if view.spotlight_meme != null else MemeSpec.new())
-	_host().set_expression(&"grin")
 	for player: PlayerState in view.players:
 		var seat: Seat = _seat(player.id)
 		if seat == null or not player.is_alive():
@@ -99,7 +97,6 @@ func _enter_spotlight(view: MatchView) -> void:
 func _enter_elimination(view: MatchView) -> void:
 	_lock_editor()
 	_everyone_idle(view)
-	_host().set_expression(&"sinister")
 	_room.focus_spotlight(view.eliminated_id)
 	_tv().show_caption(tr("%s\nIS OUT") % view.player_name(view.eliminated_id).to_upper(),
 		MatchHud.reason_text(view.elimination_reason))
@@ -109,7 +106,6 @@ func _enter_elimination(view: MatchView) -> void:
 func _enter_game_over(view: MatchView) -> void:
 	_lock_editor()
 	_everyone_idle(view)
-	_host().set_expression(&"grin")
 	_room.focus_spotlight(view.winner_id)
 	var winner: Seat = _seat(view.winner_id)
 	if winner != null:
@@ -137,7 +133,6 @@ func _apply_shots(view: MatchView, previous: MatchView) -> void:
 			shooter.flash_shot(target.get_spotlight_target())
 		if target != null:
 			target.avatar.flinch()
-		_host().set_expression(&"surprised")
 
 
 ## Players who just died get the full death; ones already dead when we arrived lie still.
@@ -188,7 +183,3 @@ func _seat(player_id: int) -> Seat:
 
 func _tv() -> WallTv:
 	return _room.get_tv()
-
-
-func _host() -> TheHost:
-	return _room.get_host()

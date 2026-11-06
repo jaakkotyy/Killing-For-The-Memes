@@ -24,7 +24,7 @@ func _entry(id: String, url: String, width: Variant = 400, height: Variant = 300
 
 
 func _library() -> MemeTemplateLibrary:
-	return MemeTemplateLibrary.from_json('{"templates": [{"id": "host_grin", "name": "Grin"}, {"id": "empty_chair"}]}')
+	return MemeTemplateLibrary.from_json('{"templates": [{"id": "crt_static", "name": "Grin"}, {"id": "empty_chair"}]}')
 
 
 # --- Catalogue ----------------------------------------------------------------------------
@@ -72,7 +72,7 @@ func test_sanitize_drops_bad_entries_from_a_host() -> void:
 	var entries: Array[Dictionary] = ImgflipCatalogue.sanitize([
 		_entry("imgflip-1", "https://i.imgflip.com/aaa.jpg"),
 		_entry("imgflip-1", "https://i.imgflip.com/bbb.jpg"),  # duplicate id
-		_entry("host_grin", "https://i.imgflip.com/ccc.jpg"),  # not an online id
+		_entry("crt_static", "https://i.imgflip.com/ccc.jpg"),  # not an online id
 		_entry("imgflip-abc", "https://i.imgflip.com/ddd.jpg"),  # not a numeric Imgflip id
 		_entry("imgflip-2", "https://evil.example/eee.jpg"),
 		_entry("imgflip-3", "https://i.imgflip.com/fff.jpg", 99999, 300),
@@ -103,16 +103,16 @@ func test_online_templates_come_first_and_can_be_replaced() -> void:
 	var library: MemeTemplateLibrary = _library()
 	assert_false(library.has_online())
 	library.set_online(ImgflipCatalogue.parse_response(RESPONSE, 2))
-	assert_eq(library.ids(), PackedStringArray(["imgflip-181913649", "imgflip-87743020", "host_grin", "empty_chair"]))
-	assert_eq(library.original_ids(), PackedStringArray(["host_grin", "empty_chair"]))
+	assert_eq(library.ids(), PackedStringArray(["imgflip-181913649", "imgflip-87743020", "crt_static", "empty_chair"]))
+	assert_eq(library.original_ids(), PackedStringArray(["crt_static", "empty_chair"]))
 	assert_true(library.is_online("imgflip-87743020"))
-	assert_false(library.is_online("host_grin"))
+	assert_false(library.is_online("crt_static"))
 	assert_eq(library.display_name("imgflip-87743020"), "Two Buttons")
 	assert_almost_eq(library.aspect("imgflip-87743020"), 600.0 / 908.0, 0.0001)
-	assert_almost_eq(library.aspect("host_grin"), 4.0 / 3.0, 0.0001)
+	assert_almost_eq(library.aspect("crt_static"), 4.0 / 3.0, 0.0001)
 	assert_eq(library.online_entries().size(), 2)
 	library.set_online([] as Array[Dictionary])
-	assert_eq(library.ids(), PackedStringArray(["host_grin", "empty_chair"]))
+	assert_eq(library.ids(), PackedStringArray(["crt_static", "empty_chair"]))
 	assert_false(library.has("imgflip-181913649"))
 	assert_eq(library.display_name("imgflip-181913649"), "imgflip-181913649")
 
@@ -135,7 +135,7 @@ func test_missing_image_offline_is_reported_as_failed() -> void:
 	library.set_online([_entry("imgflip-77", "https://i.imgflip.com/nothere1.jpg")] as Array[Dictionary])
 	assert_null(library.texture("imgflip-77"))
 	assert_true(library.image_failed("imgflip-77"))
-	assert_false(library.image_failed("host_grin"))
+	assert_false(library.image_failed("crt_static"))
 
 
 func test_cached_image_loads_without_the_network() -> void:
@@ -202,5 +202,5 @@ func test_renderer_puts_captions_on_the_image() -> void:
 	var rect: Rect2 = renderer.image_rect()
 	assert_almost_eq(rect.size.y, 300.0, 0.01)
 	assert_almost_eq(rect.size.x, 300.0 * 600.0 / 908.0, 0.01)
-	renderer.set_meme(MemeSpec.new("host_grin", "top", "bottom"))
+	renderer.set_meme(MemeSpec.new("crt_static", "top", "bottom"))
 	assert_eq(renderer.image_rect(), renderer.meme_rect())
