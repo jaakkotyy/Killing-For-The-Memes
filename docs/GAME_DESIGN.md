@@ -5,9 +5,10 @@ Tunable numbers live in one config resource (see `src/core/`), not scattered in 
 
 ## Pitch
 
-3–8 friends are chained to chairs around a table in a grimy, trap-filled room. A creepy host
-runs a "game": every round everyone makes a meme for a prompt, the room judges them, and the
-author of the worst meme is killed off in an over-the-top cartoon death. Last survivor wins.
+3–8 friends are chained to chairs around a table in a grimy, trap-filled room. Every round
+everyone makes a meme for a prompt, the hosting player presents them one by one on the wall
+TV, the room judges them, and the author of the worst meme is killed off in an over-the-top
+cartoon death. Last survivor wins.
 
 Tone: dark comedy first, horror flavour second. Deaths are slapstick (confetti, springs,
 anvils, comically oversized contraptions), never realistic gore.
@@ -16,17 +17,15 @@ anvils, comically oversized contraptions), never realistic gore.
 
 Everything is original. Specifically **avoid** anything that evokes the Saw franchise:
 no tricycle-riding puppet, no pig masks, no reverse bear trap, no "I want to play a game"
-phrasing, no tape recorders as the host's voice. Keep the host, room and traps our own.
+phrasing, no tape recorders as a captor's voice. Keep the room and traps our own.
 
-## The Host (placeholder concept)
-
-A lanky game-show mannequin in a stained tuxedo whose head is a cracked CRT television
-showing a pixel-art grin and expressions. Speaks in cheerful game-show patter.
-Name: TBD (placeholder: "The Host").
+There is no host character in the room: the player who hosts the game runs the show
+(starts it, presents the memes, starts the next game). An earlier CRT-headed robot host
+was removed.
 
 ## Presentation: 2D and 3D at the same time
 
-- The room, players and host are low-poly 3D with moody lighting.
+- The room and players are low-poly 3D with moody lighting.
 - Each player has an old CRT monitor in front of them. To make a meme, the camera zooms into
   the screen and the player works in a flat 2D editor. The editor is rendered in a
   `SubViewport` that is also the monitor's screen texture, so the zoom is seamless.
@@ -36,7 +35,7 @@ Name: TBD (placeholder: "The Host").
 ## The room (M3 greybox)
 
 - Round table; seats spread evenly over a 250° arc facing the centre, leaving the side
-  toward the wall TV open. The host stands in that gap beside the TV.
+  toward the wall TV open, so everyone can see it.
 - Each seat: wooden chair, the player chained by both wrists to bolts in the table, a
   keyboard under their hands and a CRT monitor in front of them.
 - One flickering lamp over the table, a ceiling spotlight for the presenting player,
@@ -50,18 +49,21 @@ Name: TBD (placeholder: "The Host").
   fills the screen and the editor takes over (still curved and scanlined). **Esc** looks up.
 - Pick one of the templates: popular memes from Imgflip first, then reaction GIFs from
   GIPHY (both fetched by the host, see CREDITS.md; GIFs need the host's GIPHY key), then
-  our original shots of this room (the host, players in the spotlight, the empty chair...).
+  our original shots of this room (players in the spotlight, the empty chair...).
   Type a top and a bottom caption, press **Done**. GIF memes play on the wall TV.
   Captions are uppercase with a black outline and shrink to fit. You can resubmit until
   time runs out; the draft is submitted automatically at zero.
 
 ## Core round loop (MVP)
 
-1. **Prompt** — the host announces a prompt (from the active prompt pack).
+1. **Prompt** — the wall TV shows a prompt (from the active prompt pack).
 2. **Create** — all living players make a meme simultaneously on a timer
    (pick a template, add top/bottom captions in a classic meme font).
 3. **Spotlight reveal** — memes are shown one at a time on the wall TV. While a player is
-   in the spotlight, everyone else votes and may shoot.
+   in the spotlight, everyone else votes and may shoot. The hosting player presents them at
+   their own pace: each meme stays up until they press *Next meme* (they see how many have
+   judged it), and after the last one *Show results*. (`GameConfig.host_paces_spotlight`;
+   off, each meme gets `spotlight_duration` seconds.)
 4. **Tally** — scores are computed by the server.
 5. **Elimination** — lowest score dies with a cartoon death.
 6. Repeat until one living player remains → **win screen**.
@@ -75,17 +77,17 @@ Name: TBD (placeholder: "The Host").
 | No vote | 0 |
 | Bullet | −3, visible to everyone |
 
-- Each voter casts at most one 👍/👎 per spotlight and may change it until the spotlight ends.
+- Each voter casts at most one 👍/👎 per spotlight and may change it until the host moves on.
 - Bullets: **2 per player for the whole game**; at most 1 bullet per spotlight per shooter.
 - You cannot vote on or shoot yourself.
 - **No submission** → automatically ranked last for the round (still shown as a blank meme).
-- **Tie-break** for lowest score: most bullets received this round → if still tied, the host
+- **Tie-break** for lowest score: most bullets received this round → if still tied, fate
   picks at random (server RNG, announced dramatically).
 - **Eliminated players** (MVP) stay as spectators who can still 👍/👎 vote, but cannot shoot.
   This keeps the final 1v1 decidable. Full "ghost" mechanics come later.
   (`GameConfig.eliminated_can_vote` turns this off.)
 - Elimination order of rules: non-submitters → lowest score → most bullets taken → random.
-  The reason is sent to clients so the host can announce *why* someone died.
+  The reason is sent to clients so the TV can announce *why* someone died.
 
 ## Round flow details (implemented in `src/core/game_match.gd`)
 
@@ -108,8 +110,8 @@ Name: TBD (placeholder: "The Host").
 ## Default timings (tunable)
 
 - Prompt announcement: 5 s
-- Meme creation: 75 s (or until everyone submits)
-- Spotlight per meme: 12 s
+- Meme creation: 60 s (or until everyone submits)
+- Spotlight per meme: as long as the host likes (12 s when not host-paced)
 - Elimination sequence: 6 s
 
 ## Disconnects

@@ -109,8 +109,8 @@ Godot log `Condition "d.is_null()"` and write nothing.
 Opens the room with n fake players (local player = seat 1, "You"). The spotlight hops to
 the next player 0.5 s after start and then every 3 s, and that player flinches, so frame
 ~40 shows a flinch and a lit player. Correct frames: everyone seated with hands on the
-keyboards, distinct shirt colours, name tags, glowing CRTs, the host with a green pixel
-face beside the TV. `--room-camera=seat` shows your own CRT with static, `tv` the wall TV
+keyboards, distinct shirt colours, name tags, glowing CRTs, and no host character (it was
+removed). `--room-camera=seat` shows your own CRT with static, `tv` the wall TV
 reading "KILLING FOR THE MEMES". Mouse look is off while recording a movie.
 In a debug window: Tab cycles cameras, F flinches someone, G moves the spotlight.
 The models come from the `blender-pipeline` skill.

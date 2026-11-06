@@ -14,13 +14,15 @@ integration (GodotSteam) can be added without rewriting the game.
 
 ## How to play
 
-1. **Prompt.** The host reads the round's prompt on the wall TV.
+1. **Prompt.** The round's prompt appears on the wall TV.
 2. **Make a meme.** The camera turns to your CRT: press **E** or click the monitor to zoom
-   in, pick a template, write captions and press *Submit*. When time runs out, your
-   draft is submitted for you. **Esc** looks up again.
+   in, pick a template, write captions and press *Submit*. You have 60 seconds; when
+   time runs out, your draft is submitted for you. **Esc** looks up again.
 3. **Spotlight.** Each meme in turn goes up on the TV. Press **1** (good) or **2** (bad);
    press the same key again to take your vote back. **Space** spends one of your bullets
-   on the player in the spotlight (each bullet is worth −3 points to them).
+   on the player in the spotlight (each bullet is worth −3 points to them). The host
+   presents the memes at their own pace: **Enter** (or *Next meme*) shows the next one,
+   and after the last one the results.
 4. **Elimination.** The lowest score dies. Dead players watch and still vote, but can't
    shoot. The last one alive wins; the host can then start another game.
 

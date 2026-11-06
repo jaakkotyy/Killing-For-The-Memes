@@ -154,7 +154,7 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
   export, never from hand-tuned numbers. The room only reads Session state.
   `room/MatchPresenter` drives it from `MatchView`s: TV captions and memes, spotlight,
-  camera views, the host's face, the editor's lock and timer, muzzle flashes
+  camera views, the editor's lock and timer, muzzle flashes
   (`Seat.flash_shot`) and deaths (`PlayerAvatar.die`: puff, slump over the keyboard).
   `MemeStation` (local seat only) puts the `MemeEditor` in a `SubViewport` that is the
   picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
@@ -232,7 +232,7 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   not built procedurally in Godot, so they can be previewed in Cycles renders.
 - Clothing is a vertex-colour mask on the one body mesh, tinted per player in a shader,
   instead of separate clothing meshes: one draw call per player and no clipping.
-- Meme templates are rendered from our own 3D room (host close-ups, players in poses), not
+- Meme templates are rendered from our own 3D room (players in poses, the room), not
   downloaded images: always original, always on-style, and re-renderable when the art changes.
 - The zoom hand-off forwards input with `SubViewport.push_input()` instead of reparenting
   into a `SubViewportContainer`, so the CRT keeps showing the same viewport throughout. A
@@ -258,3 +258,9 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - Match state reaches clients only as full per-player snapshots, never as events. Effects
   (shots, deaths, new spotlights) come from diffing two views, so a late or reconnecting
   client just shows the current state, and a lost snapshot is healed by the next one.
+- No host character: the hosting player runs the show. The spotlight is host-paced by
+  default (`GameConfig.host_paces_spotlight`): it has no timer (snapshot `time_left` -1,
+  `MatchView.timed` false) and ends on `GameMatch.present_next(from_index)`, which only
+  the host can send. `from_index` makes a double press harmless. Host-only actions need
+  no RPC, because the host runs the server. Bot hosts (`--auto-play`) present after
+  `spotlight_duration`, so automated full games still finish.
