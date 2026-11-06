@@ -25,6 +25,7 @@ covered by the Godot licence), emboldened. It will be replaced by an OFL Impact-
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
 | Player character (sculpt, low-poly body, UVs) | jaakkotyy (project owner) | Original work, all rights reserved | Own Blender source, kept outside the repo | `assets/models/player/` |
+| Table props: cup and saucer, soda can, glass of beer | jaakkotyy (project owner) | Original work, all rights reserved | Own Blender sources (`cup.blend`, `can.blend`, `beer.blend`), kept outside the repo | `assets/models/props/` |
 
 ## Textures & images (including meme templates)
 

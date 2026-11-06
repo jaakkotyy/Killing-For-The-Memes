@@ -8,6 +8,14 @@ extends Node3D
 
 const AVATAR_SCENE: PackedScene = preload("res://src/world/player/player_avatar.tscn")
 const MONITOR_SCENE: PackedScene = preload("res://src/world/crt/crt_monitor.tscn")
+## The artist's drinks (tools/blender/build_props.py), handed out round the table by seat.
+const DRINK_SCENES: Array[PackedScene] = [
+	preload("res://assets/models/props/can.glb"),
+	preload("res://assets/models/props/cup.glb"),
+	preload("res://assets/models/props/beer.glb"),
+]
+## Seat-space spot for the drink: right of the keyboard, clear of the monitor and the chains.
+const DRINK_OFFSET: Vector2 = Vector2(-0.36, 0.6)
 
 var player_id: int = 0
 var table_height: float = 0.71
@@ -15,6 +23,7 @@ var table_edge: float = 0.05
 
 var avatar: PlayerAvatar
 var monitor: CrtMonitor
+var drink: Node3D
 
 
 ## Builds everything. `look_index` picks the player's colours.
@@ -29,6 +38,7 @@ func setup(p_player_id: int, player_name: String, look_index: int, p_table_heigh
 	add_child(avatar)
 	_build_chair()
 	_build_desk_items()
+	_build_drink(look_index)
 	monitor = MONITOR_SCENE.instantiate()
 	monitor.glow_color = PlayerAvatar.color_for(look_index).lerp(Color(0.4, 1.0, 0.75), 0.6)
 	monitor.position = Vector3(0, table_height, 1.02)
@@ -84,6 +94,20 @@ func _build_desk_items() -> void:
 	var keyboard_z: float = wrist.z + 0.11
 	_box(Vector3(0.44, 0.025, 0.15), plastic, Vector3(0, table_height + 0.012, keyboard_z))
 	_box(Vector3(0.40, 0.012, 0.11), keys, Vector3(0, table_height + 0.03, keyboard_z + 0.005))
+
+
+## Which drink a seat gets: deterministic, so every client sees the same table.
+static func drink_index(look_index: int) -> int:
+	return posmod(look_index, DRINK_SCENES.size())
+
+
+func _build_drink(look_index: int) -> void:
+	drink = DRINK_SCENES[drink_index(look_index)].instantiate()
+	drink.name = "Drink"
+	drink.position = Vector3(DRINK_OFFSET.x, table_height, DRINK_OFFSET.y)
+	# A different turn per seat, so the cup handles and can seams don't all line up.
+	drink.rotation.y = look_index * 2.4
+	add_child(drink)
 
 
 func _build_chains() -> void:
