@@ -4,6 +4,11 @@ extends Node3D
 ## tools/blender/build_player.py) with per-seat clothes and skin, seated animations, wrist
 ## cuffs and a floating name tag.
 ##
+## Two resting states: relaxed (one of the artist's seated idles, picked per seat, with a
+## sip now and then) and typing (hands on the keyboard, the pose the chair and table are
+## measured from). A body seen from inside its own head always types: the first-person
+## camera sits at the keyboard pose's eyes, and a leaning idle would move the head away.
+##
 ## The origin is on the floor under the knees; the body faces +Z (toward the table).
 
 const MODEL: PackedScene = preload("res://assets/models/player/player.glb")
@@ -19,9 +24,18 @@ const DEATH_SLUMP: float = 0.5
 const DEATH_SECONDS: float = 0.9
 
 ## Godot's importer strips the "_loop" suffix of the Blender action and makes it loop.
+## ANIM_IDLE is the typing pose: hands on the keyboard, breathing.
 const ANIM_IDLE: StringName = &"seated_idle"
 const ANIM_FLINCH: StringName = &"flinch"
 const ANIM_LOOK_UP: StringName = &"look_up"
+## The artist's seated idles (retargeted from the Meshy FBX); each seat uses one of them.
+const ANIM_RELAXED: Array[StringName] = [&"relax_still", &"relax_lean", &"relax_fidget"]
+const ANIM_DRINK: StringName = &"drink"
+## Stands up, waves and sits back down: the winner.
+const ANIM_WAVE: StringName = &"stand_wave"
+## Seconds between sips while relaxed (random in this range).
+const SIP_INTERVAL_MIN: float = 18.0
+const SIP_INTERVAL_MAX: float = 40.0
 
 ## Muted, slightly sickly shirt colours so everyone is easy to tell apart under dim light.
 const SHIRT_COLORS: Array[Color] = [
@@ -51,6 +65,9 @@ var _label: Label3D
 var _wrists: Dictionary = {}  # "L"/"R" -> BoneAttachment3D
 var _hat: Node3D
 var _dead: bool = false
+var _relaxed: bool = true
+var _first_person: bool = false
+var _sip_in: float = 0.0
 
 
 ## Seated measurements exported with the model (seat height, eye position, wrists...).
@@ -111,9 +128,19 @@ func _ready() -> void:
 	_apply_look()
 	if _anim != null:
 		_anim.playback_default_blend_time = 0.25
-		_anim.play(ANIM_IDLE)
-		# Don't let the whole table breathe in sync.
-		_anim.seek(randf() * _anim.current_animation_length, true)
+		_play_rest(true)
+	_sip_in = randf_range(SIP_INTERVAL_MIN, SIP_INTERVAL_MAX)
+
+
+func _process(delta: float) -> void:
+	if _anim == null or _dead or not _anim.is_playing() or _anim.current_animation != _rest_animation():
+		return
+	if _rest_animation() == ANIM_IDLE or not _anim.has_animation(ANIM_DRINK):
+		return
+	_sip_in -= delta
+	if _sip_in <= 0.0:
+		_sip_in = randf_range(SIP_INTERVAL_MIN, SIP_INTERVAL_MAX)
+		_play_once(ANIM_DRINK)
 
 
 ## Short recoil, e.g. when shot at. Returns to the idle loop afterwards.
@@ -128,9 +155,37 @@ func look_up() -> void:
 		_play_once(ANIM_LOOK_UP)
 
 
+## Back to the resting animation (relaxed or typing, whichever this body is in).
 func idle() -> void:
-	if _anim != null and not _dead:
-		_anim.play(ANIM_IDLE)
+	if not _dead:
+		_play_rest(false)
+
+
+## Sits back between rounds: this seat's relaxed idle, with a sip now and then.
+func relax() -> void:
+	_relaxed = true
+	idle()
+
+
+## Hands on the keyboard (making memes).
+func type_on_keyboard() -> void:
+	_relaxed = false
+	idle()
+
+
+func is_relaxed() -> bool:
+	return _relaxed
+
+
+## The winner stands up, waves and sits back down.
+func celebrate() -> void:
+	if not _dead:
+		_play_once(ANIM_WAVE)
+
+
+## The animation this body returns to when nothing else is playing.
+func rest_animation() -> StringName:
+	return _rest_animation()
 
 
 ## Freezes the body at `time` seconds into `animation` (for staged shots and tests).
@@ -185,6 +240,10 @@ func is_hat_visible() -> bool:
 ## For the local player's own body while the camera is in their head: the hat brim would
 ## fill the top of the view, so it only casts its shadow.
 func set_first_person(on: bool) -> void:
+	if on != _first_person:
+		_first_person = on
+		if not _dead:
+			_play_rest(false)
 	if _hat == null:
 		return
 	var mode: GeometryInstance3D.ShadowCastingSetting = (
@@ -249,9 +308,39 @@ func _puff() -> void:
 func _play_once(animation: StringName) -> void:
 	if _anim == null or not _anim.has_animation(animation):
 		return
-	_anim.play(animation, 0.08)
+	_anim.play(animation, 0.08 if animation == ANIM_FLINCH else -1.0)
+	_anim.clear_queue()
 	if animation != ANIM_LOOK_UP:
-		_anim.queue(ANIM_IDLE)
+		_anim.queue(_rest_animation())
+
+
+func _rest_animation() -> StringName:
+	if _relaxed and not _first_person and _anim != null:
+		var relaxed: StringName = ANIM_RELAXED[posmod(look_index, ANIM_RELAXED.size())]
+		if _anim.has_animation(relaxed):
+			return relaxed
+	return ANIM_IDLE
+
+
+## Plays the resting loop. If a one-shot (flinch, sip, wave) is playing, it finishes first
+## and the new resting loop follows it. [param desync] starts at a random point, so the
+## table doesn't breathe in step.
+func _play_rest(desync: bool) -> void:
+	if _anim == null:
+		return
+	var rest: StringName = _rest_animation()
+	var current := StringName(_anim.current_animation)
+	var one_shot: bool = _anim.is_playing() and current in [ANIM_FLINCH, ANIM_DRINK, ANIM_WAVE]
+	if one_shot:
+		_anim.clear_queue()
+		_anim.queue(rest)
+		return
+	if current == rest and _anim.is_playing():
+		return
+	var was_resting: bool = current == ANIM_IDLE or current in ANIM_RELAXED
+	_anim.play(rest)
+	if desync or not was_resting:
+		_anim.seek(randf() * _anim.current_animation_length, true)
 
 
 func _apply_look() -> void:

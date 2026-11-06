@@ -66,6 +66,10 @@ func _enter_create(view: MatchView) -> void:
 	_room.focus_spotlight(0)
 	if _station == null:
 		return
+	for player: PlayerState in view.players:
+		var seat: Seat = _seat(player.id)
+		if seat != null and player.is_alive():
+			seat.avatar.type_on_keyboard()
 	_station.editor.reset()
 	_station.editor.set_prompt(view.prompt)
 	_station.editor.set_locked(not alive)
@@ -107,6 +111,9 @@ func _enter_game_over(view: MatchView) -> void:
 	_everyone_idle(view)
 	_host().set_expression(&"grin")
 	_room.focus_spotlight(view.winner_id)
+	var winner: Seat = _seat(view.winner_id)
+	if winner != null:
+		winner.avatar.celebrate()
 	if view.winner_id != 0:
 		_tv().show_caption(tr("%s\nSURVIVES") % view.player_name(view.winner_id).to_upper(), tr("Thank you for playing."))
 	else:
@@ -163,11 +170,12 @@ func _lock_editor() -> void:
 	_station.editor.set_locked(true)
 
 
+## Sits everyone back in their relaxed idle (between rounds, eliminations, game over).
 func _everyone_idle(view: MatchView) -> void:
 	for player: PlayerState in view.players:
 		var seat: Seat = _seat(player.id)
 		if seat != null and player.is_alive():
-			seat.avatar.idle()
+			seat.avatar.relax()
 
 
 func _local_id() -> int:

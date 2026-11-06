@@ -147,7 +147,10 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   A seat holds the chair, a drink (the artist's props from `assets/models/props/`, picked by
   `Seat.drink_index`), `PlayerAvatar` (the artist's model from `assets/models/player/`,
   tinted per seat by vertex-colour clothing masks, wearing the artist's hat on its Head bone), keyboard, `CrtMonitor` and
-  `WristChain`s. `CameraRig` glides between seat, TV and overview poses with mouse drift.
+  `WristChain`s. An avatar rests either relaxed (one of the artist's Meshy idles per seat,
+  with an occasional sip) or typing (`type_on_keyboard()`, during CREATE). Your own body
+  always types while the camera is in its head, so a leaning idle never leaves the camera
+  inside your skull. The winner `celebrate()`s (stands up and waves). `CameraRig` glides between seat, TV and overview poses with mouse drift.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
   export, never from hand-tuned numbers. The room only reads Session state.
   `room/MatchPresenter` drives it from `MatchView`s: TV captions and memes, spotlight,
@@ -244,6 +247,11 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - GIFs are decoded by our own GDScript `GifDecoder` on worker threads (a 40-frame 200 px
   GIF takes about 0.4 s): Godot can't load GIFs, and GIPHY's MP4/WebP renditions would
   need video or animated-WebP support Godot doesn't have either.
+- The artist's Meshy animations (Mixamo rig) are retargeted onto our own rig in Blender
+  (`tools/blender/retarget_mixamo.py`, world rotations relative to the rest pose). We don't
+  swap in Meshy's rig and mesh: that keeps the hat bone, clothing masks, metrics and the
+  20k-triangle body. The clips are pushed out of our table at build time (less torso lean,
+  arms turned at the shoulder), because they were made for a chair without a table.
 - Accessories (the hat) are fitted to the body in Blender and exported in the player's
   rest-pose model space; Godot only attaches them to a bone. Refitting never needs
   hand-tuned offsets in Godot. The local player's own hat is shadow-only in first person.

@@ -63,7 +63,7 @@ func _reset() -> void:
 		seat.avatar.visible = true
 		seat.monitor.visible = true
 		seat.avatar.set_label_visible(false)
-		seat.avatar.idle()
+		seat.avatar.type_on_keyboard()
 
 
 func _seat(id: int) -> Seat:
