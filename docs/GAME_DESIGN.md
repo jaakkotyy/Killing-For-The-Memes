@@ -44,6 +44,15 @@ Name: TBD (placeholder: "The Host").
 - Camera: first-person from your own seat (looking at your monitor, gentle mouse drift),
   a TV view and an overview.
 
+## Making a meme (M4)
+
+- From your seat press **E** or click your monitor: the camera glides in until the CRT
+  fills the screen and the editor takes over (still curved and scanlined). **Esc** looks up.
+- Pick one of the templates (original shots of this room: the host, players in the
+  spotlight, the empty chair...), type a top and a bottom caption, press **Done**.
+  Captions are uppercase with a black outline and shrink to fit. You can resubmit until
+  time runs out; the draft is submitted automatically at zero.
+
 ## Core round loop (MVP)
 
 1. **Prompt** — the host announces a prompt (from the active prompt pack).

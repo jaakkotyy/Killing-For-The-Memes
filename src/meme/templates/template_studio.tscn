@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/meme/templates/template_studio.gd" id="1_studio"]
+
+[node name="TemplateStudio" type="Node"]
+script = ExtResource("1_studio")

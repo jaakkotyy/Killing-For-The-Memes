@@ -13,7 +13,8 @@ extends RefCounted
 ##   --min-players=<n>    override the minimum player count (debug builds only)
 ##   --smoke-test         quit with exit code 0 once the game starts, non-zero on failure
 ##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
-##   --room-camera=<view> first room camera: seat (default), tv or overview
+##   --room-camera=<view> first room camera: seat (default), tv, overview, or editor
+##                        (starts zoomed into your CRT's meme editor)
 
 var host: bool = false
 var join_target: String = ""
@@ -26,10 +27,10 @@ var min_players: int = 0
 var smoke_test: bool = false
 ## 0 means "not set"; otherwise the number of fake players in the room preview.
 var room_preview: int = 0
-## "" (seat), "seat", "tv" or "overview".
+## "" (seat), "seat", "tv", "overview" or "editor".
 var room_camera: String = ""
 
-const ROOM_CAMERAS: PackedStringArray = ["seat", "tv", "overview"]
+const ROOM_CAMERAS: PackedStringArray = ["seat", "tv", "overview", "editor"]
 
 
 static func parse(args: PackedStringArray) -> LaunchOptions:

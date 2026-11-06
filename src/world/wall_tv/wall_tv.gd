@@ -13,6 +13,8 @@ const SCREEN_SHADER: Shader = preload("res://src/world/crt/crt_screen.gdshader")
 var _viewport: SubViewport
 var _title: Label
 var _subtitle: Label
+var _caption_box: Control
+var _meme: MemeRenderer
 
 
 func _ready() -> void:
@@ -28,6 +30,15 @@ func get_picture_root() -> SubViewport:
 func show_caption(title: String, subtitle: String = "") -> void:
 	_title.text = title
 	_subtitle.text = subtitle
+	_caption_box.visible = true
+	_meme.visible = false
+
+
+## Shows a meme full screen (the spotlight phase).
+func show_meme(spec: MemeSpec) -> void:
+	_meme.set_meme(spec)
+	_meme.visible = true
+	_caption_box.visible = false
 
 
 func get_screen_size() -> Vector2:
@@ -54,6 +65,11 @@ func _build_picture() -> void:
 	_subtitle = _label(30, Color(0.85, 0.8, 0.65))
 	box.add_child(_title)
 	box.add_child(_subtitle)
+	_caption_box = box
+	_meme = MemeRenderer.new()
+	_meme.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_meme.visible = false
+	_viewport.add_child(_meme)
 	show_caption(tr("KILLING FOR\nTHE MEMES"), tr("Please remain seated."))
 
 

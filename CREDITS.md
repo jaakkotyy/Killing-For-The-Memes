@@ -17,6 +17,9 @@ permitted (e.g. CC0, CC-BY, OFL, MIT). Record attribution text exactly as the li
 |---|---|---|---|---|
 | _none yet_ | | | | |
 
+The meme caption font is currently Godot's built-in default font (bundled with the engine,
+covered by the Godot licence), emboldened. It will be replaced by an OFL Impact-style font.
+
 ## 3D models
 
 | Name | Author | License | Source | Path |
@@ -27,7 +30,10 @@ permitted (e.g. CC0, CC-BY, OFL, MIT). Record attribution text exactly as the li
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| _none yet_ | | | | |
+| _none yet (third-party)_ | | | | |
+
+The meme templates in `assets/meme_templates/` are original: rendered from the game's own
+room and characters by `tools/capture_templates.ps1`.
 
 ## Audio
 

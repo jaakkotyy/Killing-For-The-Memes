@@ -122,6 +122,15 @@ func idle() -> void:
 		_anim.play(ANIM_IDLE)
 
 
+## Freezes the body at `time` seconds into `animation` (for staged shots and tests).
+func hold_pose(animation: StringName, time: float) -> void:
+	if _anim == null or not _anim.has_animation(animation):
+		return
+	_anim.play(animation, 0.0)
+	_anim.seek(time, true)
+	_anim.pause()
+
+
 ## Spectators (eliminated players) are drawn washed out.
 func set_spectator(enabled: bool) -> void:
 	_material.set_shader_parameter("desaturate", 0.85 if enabled else 0.0)

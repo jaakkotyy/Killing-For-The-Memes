@@ -6,6 +6,9 @@ extends Node3D
 ## The origin is the bottom centre of the case; the screen faces +Z.
 
 const SCREEN_SHADER: Shader = preload("res://src/world/crt/crt_screen.gdshader")
+## Barrel distortion of the glass; shared by the 3D screen, the zoom overlay and the
+## mouse mapping, so all three agree on where a pixel is.
+const CURVATURE: float = 0.18
 
 @export var case_size: Vector3 = Vector3(0.46, 0.40, 0.42)
 @export var screen_size: Vector2 = Vector2(0.36, 0.27)
@@ -36,6 +39,14 @@ func get_screen_size() -> Vector2:
 	return screen_size
 
 
+## Where a point on the glass (0..1, top-left origin) samples the picture: the same barrel
+## curve as the shaders. Results outside 0..1 are off the picture (the black rim).
+static func curve_uv(uv: Vector2, curvature: float = CURVATURE) -> Vector2:
+	var centred: Vector2 = uv * 2.0 - Vector2.ONE
+	centred *= 1.0 + curvature * centred.length_squared() * 0.25
+	return centred * 0.5 + Vector2(0.5, 0.5)
+
+
 func _screen_center() -> Vector3:
 	return Vector3(0.0, case_size.y * 0.55, case_size.z / 2.0 + 0.003)
 
@@ -64,6 +75,7 @@ func _build() -> void:
 	_screen_material.shader = SCREEN_SHADER
 	_screen_material.set_shader_parameter("idle_tint", glow_color)
 	_screen_material.set_shader_parameter("seed", randf() * 100.0)
+	_screen_material.set_shader_parameter("curvature", CURVATURE)
 	var glass := QuadMesh.new()
 	glass.size = screen_size
 	_add_mesh(glass, _screen_material, _screen_center())
