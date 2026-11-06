@@ -30,3 +30,15 @@ func test_ignores_unknown_and_invalid_values() -> void:
 	]))
 	assert_eq(options.port, Protocol.DEFAULT_PORT)
 	assert_eq(options.min_players, Protocol.MAX_PLAYERS, "clamped to the maximum")
+
+
+func test_room_preview_flags() -> void:
+	var options: LaunchOptions = LaunchOptions.parse(PackedStringArray(["--room-preview=6", "--room-camera=tv"]))
+	assert_eq(options.room_preview, 6)
+	assert_eq(options.room_camera, "tv")
+
+
+func test_room_preview_flags_are_validated() -> void:
+	var options: LaunchOptions = LaunchOptions.parse(PackedStringArray(["--room-preview=40", "--room-camera=ceiling"]))
+	assert_eq(options.room_preview, Protocol.MAX_PLAYERS, "clamped to the maximum")
+	assert_eq(options.room_camera, "", "unknown views are ignored")

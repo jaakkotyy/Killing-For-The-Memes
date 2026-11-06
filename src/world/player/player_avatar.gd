@@ -1,0 +1,176 @@
+class_name PlayerAvatar
+extends Node3D
+## One player's body at the table: the artist's character (assets/models/player, built by
+## tools/blender/build_player.py) with per-seat clothes and skin, seated animations, wrist
+## cuffs and a floating name tag.
+##
+## The origin is on the floor under the knees; the body faces +Z (toward the table).
+
+const MODEL: PackedScene = preload("res://assets/models/player/player.glb")
+const BODY_SHADER: Shader = preload("res://src/world/player/player_body.gdshader")
+const NORMAL_MAP: Texture2D = preload("res://assets/models/player/player_normal.png")
+const AO_MAP: Texture2D = preload("res://assets/models/player/player_ao.png")
+const METRICS_PATH: String = "res://assets/models/player/player_metrics.json"
+
+## Godot's importer strips the "_loop" suffix of the Blender action and makes it loop.
+const ANIM_IDLE: StringName = &"seated_idle"
+const ANIM_FLINCH: StringName = &"flinch"
+const ANIM_LOOK_UP: StringName = &"look_up"
+
+## Muted, slightly sickly shirt colours so everyone is easy to tell apart under dim light.
+const SHIRT_COLORS: Array[Color] = [
+	Color(0.72, 0.58, 0.22), Color(0.20, 0.50, 0.52), Color(0.55, 0.17, 0.18),
+	Color(0.42, 0.48, 0.22), Color(0.30, 0.38, 0.62), Color(0.78, 0.40, 0.16),
+	Color(0.45, 0.28, 0.55), Color(0.78, 0.76, 0.68),
+]
+const SKIN_TONES: Array[Color] = [
+	Color(0.86, 0.66, 0.53), Color(0.55, 0.37, 0.26), Color(0.75, 0.55, 0.41),
+	Color(0.38, 0.25, 0.18), Color(0.92, 0.74, 0.62), Color(0.65, 0.46, 0.33),
+]
+const TROUSER_COLORS: Array[Color] = [
+	Color(0.16, 0.15, 0.14), Color(0.22, 0.20, 0.16), Color(0.14, 0.16, 0.20),
+]
+
+static var _metrics: Dictionary = {}
+
+var display_name: String = ""
+var look_index: int = 0
+
+var _model: Node3D
+var _anim: AnimationPlayer
+var _skeleton: Skeleton3D
+var _body: MeshInstance3D
+var _material: ShaderMaterial
+var _label: Label3D
+var _wrists: Dictionary = {}  # "L"/"R" -> BoneAttachment3D
+
+
+## Seated measurements exported with the model (seat height, eye position, wrists...).
+static func metrics() -> Dictionary:
+	if _metrics.is_empty():
+		var file := FileAccess.open(METRICS_PATH, FileAccess.READ)
+		var json := JSON.new()
+		if file != null and json.parse(file.get_as_text()) == OK and json.data is Dictionary:
+			_metrics = json.data
+		else:
+			push_error("Missing or broken %s; run tools/build_models.ps1" % METRICS_PATH)
+			_metrics = {"seat_height": 0.4, "forearm_bottom": 0.72, "seated_eyes": [0, 1.28, 0.05]}
+	return _metrics
+
+
+static func metric_vector(key: String) -> Vector3:
+	var value: Variant = metrics().get(key, [0, 0, 0])
+	if value is Array and (value as Array).size() == 3:
+		var a: Array = value
+		return Vector3(float(a[0]), float(a[1]), float(a[2]))
+	return Vector3.ZERO
+
+
+static func color_for(index: int) -> Color:
+	return SHIRT_COLORS[posmod(index, SHIRT_COLORS.size())]
+
+
+func setup(p_name: String, p_look_index: int) -> void:
+	display_name = p_name
+	look_index = p_look_index
+	if is_node_ready():
+		_apply_look()
+
+
+func _ready() -> void:
+	_model = MODEL.instantiate()
+	add_child(_model)
+	_anim = _model.find_children("*", "AnimationPlayer", true, false).front() as AnimationPlayer
+	_skeleton = _model.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D
+	_body = _model.find_children("*", "MeshInstance3D", true, false).front() as MeshInstance3D
+
+	_material = ShaderMaterial.new()
+	_material.shader = BODY_SHADER
+	_material.set_shader_parameter("normal_map", NORMAL_MAP)
+	_material.set_shader_parameter("ao_map", AO_MAP)
+	_body.material_override = _material
+
+	_label = Label3D.new()
+	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_label.font_size = 40
+	_label.pixel_size = 0.004
+	_label.outline_size = 10
+	_label.position = metric_vector("seated_eyes") + Vector3(0, 0.38, -0.05)
+	add_child(_label)
+
+	_add_cuffs()
+	_apply_look()
+	if _anim != null:
+		_anim.playback_default_blend_time = 0.25
+		_anim.play(ANIM_IDLE)
+		# Don't let the whole table breathe in sync.
+		_anim.seek(randf() * _anim.current_animation_length, true)
+
+
+## Short recoil, e.g. when shot at. Returns to the idle loop afterwards.
+func flinch() -> void:
+	_play_once(ANIM_FLINCH)
+
+
+## Raises the head toward the wall TV (spotlight phase).
+func look_up() -> void:
+	_play_once(ANIM_LOOK_UP)
+
+
+func idle() -> void:
+	if _anim != null:
+		_anim.play(ANIM_IDLE)
+
+
+## Spectators (eliminated players) are drawn washed out.
+func set_spectator(enabled: bool) -> void:
+	_material.set_shader_parameter("desaturate", 0.85 if enabled else 0.0)
+
+
+## The wrist cuff nodes ("L"/"R"), for chains to follow.
+func get_wrist(side: String) -> Node3D:
+	return _wrists.get(side) as Node3D
+
+
+## Hides the name tag (your own, in first person).
+func set_label_visible(on: bool) -> void:
+	_label.visible = on
+
+
+func _play_once(animation: StringName) -> void:
+	if _anim == null or not _anim.has_animation(animation):
+		return
+	_anim.play(animation, 0.08)
+	if animation != ANIM_LOOK_UP:
+		_anim.queue(ANIM_IDLE)
+
+
+func _apply_look() -> void:
+	var shirt: Color = color_for(look_index)
+	_material.set_shader_parameter("shirt_color", shirt)
+	# Different strides so neighbours rarely share skin tone and trousers with a shirt.
+	_material.set_shader_parameter("skin_color", SKIN_TONES[posmod(look_index * 5 + 1, SKIN_TONES.size())])
+	_material.set_shader_parameter("trouser_color", TROUSER_COLORS[posmod(look_index, TROUSER_COLORS.size())])
+	_label.text = display_name
+	_label.modulate = shirt.lightened(0.35)
+
+
+func _add_cuffs() -> void:
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.42, 0.40, 0.38)
+	steel.metallic = 0.85
+	steel.roughness = 0.45
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.038
+	ring.outer_radius = 0.052
+	for side: String in ["L", "R"]:
+		var attachment := BoneAttachment3D.new()
+		attachment.bone_name = "Hand." + side
+		_skeleton.add_child(attachment)
+		var cuff := MeshInstance3D.new()
+		cuff.mesh = ring
+		cuff.material_override = steel
+		# A little up the forearm from the wrist joint; the bone's Y axis runs along the hand.
+		cuff.position = Vector3(0.0, -0.035, 0.0)
+		attachment.add_child(cuff)
+		_wrists[side] = cuff
