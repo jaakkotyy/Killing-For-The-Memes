@@ -7,9 +7,9 @@ shoots), and the author of the worst meme dies a ridiculous cartoon death. Last 
 Built with **Godot 4.7.2** (GDScript). Windows first; Linux/macOS later. Designed so Steam
 integration (GodotSteam) can be added without rewriting the game.
 
-> Status: **M3 — 3D room** (menu, host/join, lobby, round rules tested; the 3D room with
-> seated players, CRTs, wall TV and host; memes and the round loop arrive in M4/M5). See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) for the
-> design and [CLAUDE.md](CLAUDE.md) for architecture and conventions.
+> Status: **M4 — meme editor** (menu, host/join, lobby, round rules tested; the 3D room
+> with seated players, CRTs, wall TV and host; zoom into your CRT to make a meme. Sending
+> memes to the server, voting and deaths arrive in M5).
 
 ## Requirements
 
@@ -59,7 +59,12 @@ players, who flinch):
 & $env:GODOT --path . -- --room-preview=8 --room-camera=overview # or tv
 ```
 
-In debug builds: **Tab** cycles the camera, **F** makes someone flinch, **G** moves the spotlight.
+From your seat, press **E** or click your monitor to zoom into the meme editor; **Esc**
+looks up again. `--room-camera=editor` starts zoomed in. In debug builds: **Tab** cycles
+the camera, **F** makes someone flinch, **G** moves the spotlight.
+
+The meme templates are rendered from the room itself. After changing the room or the
+characters, re-render them with `.\tools\capture_templates.ps1` (opens a window briefly).
 
 ## Character models
 
@@ -111,7 +116,7 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--min-players=<n>` | Lower the 3-player minimum (debug builds only) |
 | `--smoke-test` | Exit 0 once the game starts, non-zero on failure |
 | `--room-preview=<n>` | Open the 3D room directly with n fake players (no network) |
-| `--room-camera=<view>` | First room camera: `seat` (default), `tv` or `overview` |
+| `--room-camera=<view>` | First room camera: `seat` (default), `tv`, `overview` or `editor` |
 
 ## Playing over the internet (before Steam)
 

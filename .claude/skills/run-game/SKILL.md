@@ -22,6 +22,7 @@ plain `.exe` for windows the user will look at.
 | The user wants to see or play it | 3. Windowed instances + capture |
 | Screenshot one screen without disturbing the user's desktop | 4. Offscreen frames |
 | Look at the 3D room, characters, lighting | 5. Room preview |
+| Check the meme editor or the CRT zoom | 6. Meme editor |
 
 ### 1. Smoke test (automated, about 10 s)
 
@@ -53,7 +54,7 @@ and print the failure reason (for example a join rejection message).
 
 Launch flags (after `--`): `--host`, `--join=<ip|ip:port|code>`, `--name=`, `--port=`,
 `--auto-ready`, `--auto-start`, `--min-players=<n>` (debug builds), `--smoke-test`,
-`--room-preview=<n>`, `--room-camera=seat|tv|overview`.
+`--room-preview=<n>`, `--room-camera=seat|tv|overview|editor`.
 The source of truth is `src/util/launch_options.gd`.
 
 ### 3. Windowed instances for the user
@@ -99,6 +100,23 @@ reading "KILLING FOR THE MEMES". Mouse look is off while recording a movie.
 In a debug window: Tab cycles cameras, F flinches someone, G moves the spotlight.
 The models come from the `blender-pipeline` skill.
 
+### 6. Meme editor and CRT zoom
+
+```bash
+"$G" --path . --resolution 1280x720 --write-movie "C:/<scratchpad>/editor/f.png" --quit-after 60 -- --room-preview=6 --room-camera=editor
+```
+
+Starts already zoomed into your CRT. A correct frame: the green-phosphor editor fills the
+screen with a slight barrel curve and scanlines; prompt at the top, the template list with
+thumbnails on the left (first one selected), a 4:3 preview, two caption fields and DONE.
+With `--room-camera=seat` instead, the same editor is the picture on your CRT in 3D.
+To see the zoom itself, start at `seat` and record ~120 frames while pressing **E** in a
+window (or call `MemeStation.open()` from a test). The automated check of typing, clicking
+Done through the curve and Esc is `tests/unit/test_crt_zoom.gd`. A submitted meme prints
+`[Room] Meme submitted: ...` and appears on the wall TV (until M5 sends it to the server).
+After room or character changes, re-render the templates with `.\tools\capture_templates.ps1`
+and look at the JPGs in `assets/meme_templates/`.
+
 ## Pitfalls (all hit in practice)
 
 - **The user may be clicking the windows.** In mode 3 the user often interacts (Ready is a
@@ -121,6 +139,8 @@ The models come from the `blender-pipeline` skill.
   does for `--path`.
 - **Exit codes from Start-Process.** Read `$proc.Handle` right after starting, or
   `$proc.ExitCode` comes back empty.
+- **Synthetic input in tests.** Push events to the root with `push_input(event, true)`;
+  the headless root viewport is stretched, so plain `push_input` misplaces mouse clicks.
 - **Fresh clone.** Run `--headless --import` once (all `tools/*.ps1` scripts do) before
   launching, or global class names such as `LobbyState` won't resolve.
 

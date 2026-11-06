@@ -35,9 +35,11 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
 .\tools\build_models.ps1 [-SkipBake] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
+.\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
 ```
 
-To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview]`.
+To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
+(`editor` starts zoomed into your CRT's meme editor).
 To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
 
 Run `run_tests.ps1` before every commit and `smoke_test.ps1` before merging networking
@@ -101,7 +103,13 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - **`src/platform/`** — `PlatformService` (achievements, friend names, invites, rich presence)
   with `NullPlatform` now, `SteamPlatform` later.
 - **`src/meme/`** — memes travel over the network as a small `MemeSpec` dictionary
-  (template id + captions), never as images. Every client renders them locally.
+  (template id + captions), never as images. Every client renders them locally with
+  `MemeRenderer` (template + outlined captions that shrink to fit). `MemeTemplateLibrary`
+  reads `data/meme_templates.json`; its `ids()` are what the server allows. Template images
+  (`assets/meme_templates/<id>.jpg`) are original: staged shots of our own room, rendered by
+  `tools/capture_templates.ps1` (`templates/template_studio.gd`, one `_shot_<id>()` each).
+  `editor/MemeEditor` (800x600) edits a local draft, emits `submitted`, and auto-submits
+  the draft when its countdown hits zero.
 - **`src/world/`** — 3D room. `room/room.gd` builds the greybox room in code and places one
   `Seat` per player with `SeatLayout` (an arc that leaves the TV side open for the host).
   A seat holds the chair, `PlayerAvatar` (the artist's model from `assets/models/player/`,
@@ -110,10 +118,12 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
   export, never from hand-tuned numbers. The room only reads Session state; M5 drives
   `focus_spotlight()`, flinches and deaths from snapshots.
-  The CRT screen shows a `SubViewport` that hosts the 2D meme editor (M4); the zoom
-  transition tweens the camera to a pose where the screen fills the view, then hands the
-  same viewport to fullscreen with input (reverse on exit). The wall TV's picture is a
-  `SubViewport` too (`WallTv.get_picture_root()`).
+  `MemeStation` (local seat only) puts the `MemeEditor` in a `SubViewport` that is the
+  picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
+  `FILL` of the view, then shows the same texture fullscreen through `crt_overlay.gdshader`
+  and forwards input (`push_input`, mouse mapped through `CrtMonitor.curve_uv`, the same
+  barrel curve as both shaders, so nothing jumps). Escape reverses it. The wall TV's
+  picture is a `SubViewport` too (`WallTv.show_meme()` / `show_caption()`).
 - **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
   sharing a base class, registered with the server so it can validate their intents.
 - **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).
@@ -149,7 +159,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   disconnects, per-player snapshots, default prompt pack. Not wired to the network yet (M5).
 - [x] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig,
   the artist's player model rigged/animated via `tools/build_models.ps1`, `--room-preview`.
-- [ ] **M4** Meme editor + CRT zoom transition
+- [x] **M4** Meme editor + CRT zoom transition: 8 original templates from our own room, editor
+  with live preview and auto-submit, zoom with input hand-off. Submits stay local until M5.
 - [ ] **M5** Full round loop wired end to end, win screen
 - [ ] **M6** Hardening (disconnects, timeouts), SFX, Windows build, playtest
 - Post-MVP: Steam (GodotSteam), ghosts, activities, HP mode, GIFs, prompt packs, Linux/macOS
@@ -176,3 +187,10 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   not built procedurally in Godot, so they can be previewed in Cycles renders.
 - Clothing is a vertex-colour mask on the one body mesh, tinted per player in a shader,
   instead of separate clothing meshes: one draw call per player and no clipping.
+- Meme templates are rendered from our own 3D room (host close-ups, players in poses), not
+  downloaded images: always original, always on-style, and re-renderable when the art changes.
+- The zoom hand-off forwards input with `SubViewport.push_input()` instead of reparenting
+  into a `SubViewportContainer`, so the CRT keeps showing the same viewport throughout. A
+  container-less SubViewport ignores the mouse until it gets `NOTIFICATION_VP_MOUSE_ENTER`.
+- Push test input to the root with `push_input(event, true)`: positions must already be in
+  the stretched root-viewport space that `_input()` sees (the headless window is tiny).
