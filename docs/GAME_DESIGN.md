@@ -48,8 +48,9 @@ Name: TBD (placeholder: "The Host").
 
 - From your seat press **E** or click your monitor: the camera glides in until the CRT
   fills the screen and the editor takes over (still curved and scanlined). **Esc** looks up.
-- Pick one of the templates (original shots of this room: the host, players in the
-  spotlight, the empty chair...), type a top and a bottom caption, press **Done**.
+- Pick one of the templates: popular memes from Imgflip first (fetched by the host, see
+  CREDITS.md), then our original shots of this room (the host, players in the spotlight,
+  the empty chair...). Type a top and a bottom caption, press **Done**.
   Captions are uppercase with a black outline and shrink to fit. You can resubmit until
   time runs out; the draft is submitted automatically at zero.
 
@@ -127,6 +128,8 @@ Name: TBD (placeholder: "The Host").
   meme, bet on who dies to earn bullets, lockpicking minigame for a one-time escape, throwing
   physics objects at the spotlight player.
 - **HP mode**: damage instead of instant death.
-- **GIF templates** via a GIF API.
+- **GIF templates** via a GIF API (GIPHY: needs a key, "Powered by GIPHY" attribution and
+  our own GIF decoder; Tenor's API shut down on 2026-06-30).
+- **Caption boxes per template** (e.g. Drake's two panels) instead of top/bottom only.
 - **Custom prompt packs** (JSON in `data/prompts/`, later user-loadable / Workshop).
 - **Steam**: lobbies, friend invites, P2P relay networking, achievements, rich presence.

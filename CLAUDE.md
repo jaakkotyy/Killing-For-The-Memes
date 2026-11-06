@@ -15,8 +15,11 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 - Online multiplayer, **server-authoritative** (the hosting player is the server).
 - Must be Steam-ready: Steamworks lobbies, invites, P2P networking and achievements must be
   addable **without touching game logic**. All networking goes through the transport layer.
-- **Everything original.** Nothing from Saw or other copyrighted media. Only assets whose
-  license allows commercial use; every third-party asset goes in `CREDITS.md` in the same commit.
+- **Everything we ship is original.** Nothing from Saw or other copyrighted media. Only assets
+  whose license allows commercial use; every third-party asset goes in `CREDITS.md` in the same commit.
+  The one exception is opt-out and never shipped: popular meme templates fetched at run time
+  from Imgflip (`src/meme/online/`). They are other people's copyrighted images; their use
+  must be cleared (or the source swapped for a licensed one) before a commercial release.
 
 ## Stack
 
@@ -33,6 +36,7 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 .\tools\run_tests.ps1                # import + run all unit tests headless
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
 .\tools\smoke_test.ps1 -Clients 3 -FullGame   # ...and bots play a whole match to GAME_OVER
+.\tools\smoke_test.ps1 -FullGame -Online      # same, with popular templates from Imgflip (needs internet)
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\run_local.ps1 -Bots -FastRounds      # play the host against bot clients
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
@@ -118,6 +122,15 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   reads `data/meme_templates.json`; its `ids()` are what the server allows. Template images
   (`assets/meme_templates/<id>.jpg`) are original: staged shots of our own room, rendered by
   `tools/capture_templates.ps1` (`templates/template_studio.gd`, one `_shot_<id>()` each).
+  `online/`: popular templates. On the host, `OnlineTemplateSource` fetches Imgflip's top
+  list while people join (falling back to the catalogue saved last time); App puts it in
+  the library and `Session.set_template_catalogue()`, and `_rpc_game_started` sends it to
+  everyone. `ImgflipCatalogue` validates it on both ends (ids `imgflip-<n>`, URLs only
+  `https://i.imgflip.com/<name>.jpg|png`). `TemplateImageCache` downloads each image once
+  per machine into `user://template_cache/`, decoding on worker threads; the library's
+  `image_updated` signal tells the renderer and editor when one arrives. Online ids come
+  first in `ids()`. `MemeRenderer` letterboxes any aspect inside the 4:3 frame, captions on
+  the image. Off with `Settings.online_templates` or `--offline-templates`.
   `editor/MemeEditor` (800x600) edits a local draft, emits `submitted`, and auto-submits
   the draft when its countdown hits zero.
 - **`src/world/`** — 3D room. `room/room.gd` builds the greybox room in code and places one
@@ -214,6 +227,10 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   container-less SubViewport ignores the mouse until it gets `NOTIFICATION_VP_MOUSE_ENTER`.
 - Push test input to the root with `push_input(event, true)`: positions must already be in
   the stretched root-viewport space that `_input()` sees (the headless window is tiny).
+- Popular templates are fetched at run time, not bundled: the images aren't ours to ship,
+  and a runtime source can be switched off or swapped for a licensed one without touching
+  game logic. Clients download them straight from the image host (memes still travel as
+  ids + captions), and validate the host's catalogue so it can only point at Imgflip.
 - Accessories (the hat) are fitted to the body in Blender and exported in the player's
   rest-pose model space; Godot only attaches them to a bone. Refitting never needs
   hand-tuned offsets in Godot. The local player's own hat is shadow-only in first person.

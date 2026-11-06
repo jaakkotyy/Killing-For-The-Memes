@@ -30,7 +30,7 @@ plain `.exe` for windows the user will look at.
 
 ```powershell
 .\tools\smoke_test.ps1 -Clients 3
-.\tools\smoke_test.ps1 -Clients 3 -FullGame [-Seed 7]
+.\tools\smoke_test.ps1 -Clients 3 -FullGame [-Seed 7] [-Online]
 ```
 
 Host + N headless clients join, auto-ready and auto-start. Every instance must print
@@ -38,6 +38,8 @@ Host + N headless clients join, auto-ready and auto-start. Every instance must p
 With `-FullGame` every instance is an `--auto-play` bot on `--fast-rounds` timers and must
 print `SMOKE_TEST PASS: game over after N rounds, winner <name>` (N = players - 1). Also
 search the logs for `SCRIPT ERROR`: the room, presenter and HUD run headless on every peer.
+Smoke tests pass `--offline-templates` unless `-Online` is given; then the host must log
+`[Templates] 40 popular templates from Imgflip.` and bots submit `imgflip-<n>` ids.
 
 ### 2. Custom headless scenario
 
@@ -118,7 +120,11 @@ The models come from the `blender-pipeline` skill.
 
 Starts already zoomed into your CRT. A correct frame: the green-phosphor editor fills the
 screen with a slight barrel curve and scanlines; prompt at the top, the template list with
-thumbnails on the left (first one selected), a 4:3 preview, two caption fields and DONE.
+thumbnails on the right (first one selected), a 4:3 preview, two caption fields and DONE.
+The preview never goes online but loads the Imgflip catalogue saved by the last hosted
+game: then the list starts with Drake, Two Buttons, ... (letterboxed in the preview) and
+the hint line ends with "Popular templates via imgflip.com". Images not yet in
+`user://template_cache/` show LOADING... and fill in as they download.
 With `--room-camera=seat` instead, the same editor is the picture on your CRT in 3D.
 To see the zoom itself, start at `seat` and record ~120 frames while pressing **E** in a
 window (or call `MemeStation.open()` from a test). The automated check of typing, clicking

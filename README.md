@@ -26,6 +26,16 @@ integration (GodotSteam) can be added without rewriting the game.
 
 **Tab** cycles the camera (your seat, the TV, an overview of the table) at any time.
 
+### Meme templates
+
+Besides our own templates (shots of this room), the host offers the 40 most popular meme
+templates from [Imgflip](https://imgflip.com). The host fetches the list while people
+join; every player downloads the images once and keeps them in
+`%APPDATA%\Godot\app_userdata\Killing for the Memes\template_cache\`. Without internet the
+game falls back to the list saved last time, and then to our own templates only. Turn it
+off with `--offline-templates` (or `online_templates=false` in `settings.cfg`). Those
+images belong to their owners; see [CREDITS.md](CREDITS.md).
+
 ## Requirements
 
 - [Godot 4.7.2 (standard, not .NET)](https://godotengine.org/download/archive/4.7.2-stable/)
@@ -112,6 +122,7 @@ merging networking changes.
 ```powershell
 .\tools\smoke_test.ps1 -Clients 3
 .\tools\smoke_test.ps1 -Clients 3 -FullGame
+.\tools\smoke_test.ps1 -Clients 3 -FullGame -Online   # with Imgflip templates (needs internet)
 ```
 
 **From the editor:** *Debug → Customize Run Instances…* → enable multiple instances, then
@@ -138,6 +149,7 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--auto-play` | A bot plays for this instance (random memes, votes and shots) |
 | `--fast-rounds` | Short phase timers (host, debug builds only) |
 | `--seed=<n>` | Fixed random seed for the match: prompts, spotlight order, tie-breaks (host) |
+| `--offline-templates` | Host only our own templates; don't fetch popular ones from Imgflip |
 | `--room-preview=<n>` | Open the 3D room directly with n fake players (no network) |
 | `--room-camera=<view>` | First room camera: `seat` (default), `tv`, `overview` or `editor` |
 

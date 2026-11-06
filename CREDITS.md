@@ -37,6 +37,18 @@ covered by the Godot licence), emboldened. It will be replaced by an OFL Impact-
 The meme templates in `assets/meme_templates/` are original: rendered from the game's own
 room and characters by `tools/capture_templates.ps1`.
 
+### Online templates (not shipped)
+
+| Name | Owner | License | Source | Path |
+|---|---|---|---|---|
+| Popular meme templates (Imgflip's top list) | Their respective copyright holders | **Not licensed to us** | https://api.imgflip.com/get_memes, images from `i.imgflip.com` | Downloaded at run time to `user://template_cache/` |
+
+These images are not in the repository or the builds. The game fetches them on the
+player's machine when the host has online templates on (the default) and credits Imgflip
+in the meme editor. **Before a commercial release**, either clear their use (Imgflip's
+terms and the images' rights holders) or switch the source off or to a licensed provider
+(`src/meme/online/online_template_source.gd`).
+
 ## Audio
 
 | Name | Author | License | Source | Path |
