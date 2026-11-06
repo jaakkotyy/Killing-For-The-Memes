@@ -12,6 +12,8 @@ extends Resource
 @export var spotlight_duration: float = 12.0
 ## Scores are revealed and the loser dies.
 @export var elimination_duration: float = 6.0
+## Clients auto-submit their draft this long before creation ends, so it arrives in time.
+@export var auto_submit_lead: float = 1.0
 
 @export_group("Scoring")
 @export var upvote_points: int = 1
@@ -35,6 +37,7 @@ func to_dict() -> Dictionary:
 		"create_duration": create_duration,
 		"spotlight_duration": spotlight_duration,
 		"elimination_duration": elimination_duration,
+		"auto_submit_lead": auto_submit_lead,
 		"upvote_points": upvote_points,
 		"downvote_points": downvote_points,
 		"bullet_points": bullet_points,
