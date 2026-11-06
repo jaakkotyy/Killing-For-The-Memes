@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _capture_all() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MemeTemplateLibrary.IMAGE_DIR))
-	for id: String in MemeTemplateLibrary.get_default().ids():
+	for id: String in MemeTemplateLibrary.get_default().original_ids():
 		_reset()
 		if not has_method("_shot_" + id):
 			push_error("No studio shot for template '%s'" % id)

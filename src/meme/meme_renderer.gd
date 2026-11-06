@@ -3,6 +3,9 @@ extends Control
 ## Draws a MemeSpec: the template image with classic top/bottom captions (white, uppercase,
 ## thick black outline), shrinking the text until it fits. Every client renders memes from
 ## the spec locally; the editor preview and the wall TV both use this control.
+##
+## The meme is always a 4:3 frame. Templates of other shapes (most online ones) are
+## letterboxed inside it on black, and the captions sit on the image itself.
 
 ## Caption boxes as fractions of the meme's rect.
 const TOP_BOX: Rect2 = Rect2(0.04, 0.025, 0.92, 0.25)
@@ -16,6 +19,7 @@ static var _meme_font: Font
 
 var library: MemeTemplateLibrary
 var _spec: MemeSpec = MemeSpec.new()
+var _watched: MemeTemplateLibrary
 
 
 ## The bold caption font. A placeholder until the OFL meme font is added (see CREDITS.md).
@@ -59,9 +63,22 @@ func get_meme() -> MemeSpec:
 
 ## The 4:3 area the meme is drawn in, centred in this control.
 func meme_rect() -> Rect2:
-	var width: float = minf(size.x, size.y * ASPECT)
-	var height: float = width / ASPECT
-	return Rect2((size - Vector2(width, height)) / 2.0, Vector2(width, height))
+	return fit_rect(Rect2(Vector2.ZERO, size), ASPECT)
+
+
+## The largest rect of [param aspect] (width / height) centred in [param bounds].
+static func fit_rect(bounds: Rect2, aspect: float) -> Rect2:
+	var width: float = minf(bounds.size.x, bounds.size.y * aspect)
+	var height: float = width / aspect
+	return Rect2(bounds.position + (bounds.size - Vector2(width, height)) / 2.0, Vector2(width, height))
+
+
+## Where the template image (and so the captions) go inside the meme frame.
+func image_rect() -> Rect2:
+	var frame: Rect2 = meme_rect()
+	if library == null or _spec.is_blank():
+		return frame
+	return fit_rect(frame, library.aspect(_spec.template_id))
 
 
 func _draw() -> void:
@@ -70,11 +87,33 @@ func _draw() -> void:
 	if _spec.is_blank():
 		_draw_caption(tr("NO MEME SUBMITTED"), rect, Rect2(0.1, 0.4, 0.8, 0.2), false, Color(0.55, 0.55, 0.55))
 		return
+	_watch(library)
+	var image: Rect2 = image_rect()
 	var texture: Texture2D = library.texture(_spec.template_id) if library != null else null
 	if texture != null:
-		draw_texture_rect(texture, rect, false)
-	_draw_caption(_spec.top_text.to_upper(), rect, TOP_BOX, true, Color.WHITE)
-	_draw_caption(_spec.bottom_text.to_upper(), rect, BOTTOM_BOX, false, Color.WHITE)
+		draw_texture_rect(texture, image, false)
+	elif library != null and library.is_online(_spec.template_id):
+		var waiting: String = tr("IMAGE UNAVAILABLE") if library.image_failed(_spec.template_id) else tr("LOADING...")
+		draw_rect(image, Color(0.08, 0.08, 0.08))
+		_draw_caption(waiting, image, Rect2(0.1, 0.42, 0.8, 0.16), false, Color(0.5, 0.5, 0.5))
+	_draw_caption(_spec.top_text.to_upper(), image, TOP_BOX, true, Color.WHITE)
+	_draw_caption(_spec.bottom_text.to_upper(), image, BOTTOM_BOX, false, Color.WHITE)
+
+
+## Redraw when the image we are waiting for arrives.
+func _watch(target: MemeTemplateLibrary) -> void:
+	if target == _watched:
+		return
+	if _watched != null and _watched.image_updated.is_connected(_on_image_updated):
+		_watched.image_updated.disconnect(_on_image_updated)
+	_watched = target
+	if _watched != null:
+		_watched.image_updated.connect(_on_image_updated)
+
+
+func _on_image_updated(id: String) -> void:
+	if id == _spec.template_id:
+		queue_redraw()
 
 
 func _draw_caption(text: String, rect: Rect2, box_fraction: Rect2, align_top: bool, color: Color) -> void:

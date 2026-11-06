@@ -1,20 +1,32 @@
 class_name MemeTemplateLibrary
 extends RefCounted
-## The meme templates players can pick from, loaded from data/meme_templates.json.
+## The meme templates players can pick from.
 ##
-## Every template is an original image in assets/meme_templates/<id>.jpg (rendered from the
-## game's own room by tools/capture_templates.ps1). The server uses ids() to validate
-## submitted memes; clients use texture() to render them.
+## Two kinds:
+## - Our originals, from data/meme_templates.json: images in assets/meme_templates/<id>.jpg,
+##   rendered from the game's own room by tools/capture_templates.ps1. Always available.
+## - Online templates (popular memes from Imgflip), added at run time with set_online().
+##   Their images download in the background (TemplateImageCache); texture() returns null
+##   until then and image_updated fires when one arrives (or fails). They come first in ids().
+##
+## The server uses ids() to validate submitted memes; clients use texture() to render them.
+
+## An online template's image finished downloading, or failed to (see image_failed()).
+signal image_updated(id: String)
 
 const DEFAULT_PATH: String = "res://data/meme_templates.json"
 const IMAGE_DIR: String = "res://assets/meme_templates/"
 const NAME_MAX_LENGTH: int = 40
+const ORIGINAL_ASPECT: float = 4.0 / 3.0
 
 static var _default: MemeTemplateLibrary
 
-var _ids: PackedStringArray = []
+var _original_ids: PackedStringArray = []
+var _online_ids: PackedStringArray = []
 var _names: Dictionary = {}  # id -> display name
-var _textures: Dictionary = {}  # id -> Texture2D (loaded lazily)
+var _textures: Dictionary = {}  # original id -> Texture2D (loaded lazily)
+var _online: Dictionary = {}  # online id -> catalogue entry (see ImgflipCatalogue)
+var _cache_connected: bool = false
 
 
 ## The shared library from data/meme_templates.json.
@@ -41,43 +53,117 @@ static func from_json(json_text: String) -> MemeTemplateLibrary:
 			continue
 		var id: Variant = (entry as Dictionary).get("id")
 		var display: Variant = (entry as Dictionary).get("name", "")
-		if typeof(id) != TYPE_STRING or not MemeSpec.is_valid_template_id(id) or library._ids.has(id):
+		if typeof(id) != TYPE_STRING or not MemeSpec.is_valid_template_id(id) or library._original_ids.has(id) \
+				or ImgflipCatalogue.is_online_id(id):
 			continue
-		library._ids.append(id)
+		library._original_ids.append(id)
 		var label: String = str(display).strip_edges().substr(0, NAME_MAX_LENGTH)
 		library._names[id] = label if not label.is_empty() else id
 	return library
 
 
+## Replaces the online templates with [param entries] (already validated catalogue
+## entries; pass them through ImgflipCatalogue.sanitize() when they come from the network).
+func set_online(entries: Array[Dictionary]) -> void:
+	for id: String in _online_ids:
+		_names.erase(id)
+	_online_ids.clear()
+	_online.clear()
+	for entry: Dictionary in entries:
+		var id: String = entry["id"]
+		if _online.has(id) or _original_ids.has(id):
+			continue
+		_online_ids.append(id)
+		_online[id] = entry
+		_names[id] = entry["name"]
+
+
+## The catalogue entries set_online() was given, in order (what the host sends clients).
+func online_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for id: String in _online_ids:
+		entries.append(_online[id])
+	return entries
+
+
+## Online templates first (the popular ones players look for), then our originals.
 func ids() -> PackedStringArray:
-	return _ids
+	return _online_ids + _original_ids
+
+
+func original_ids() -> PackedStringArray:
+	return _original_ids
 
 
 func size() -> int:
-	return _ids.size()
+	return _online_ids.size() + _original_ids.size()
 
 
 func is_empty() -> bool:
-	return _ids.is_empty()
+	return size() == 0
 
 
 func has(id: String) -> bool:
-	return _ids.has(id)
+	return _online.has(id) or _original_ids.has(id)
+
+
+func has_online() -> bool:
+	return not _online_ids.is_empty()
+
+
+func is_online(id: String) -> bool:
+	return _online.has(id)
 
 
 func display_name(id: String) -> String:
 	return _names.get(id, id)
 
 
+## Width / height of the template image (known before an online image has downloaded).
+func aspect(id: String) -> float:
+	if _online.has(id):
+		var entry: Dictionary = _online[id]
+		return float(entry["width"]) / float(entry["height"])
+	return ORIGINAL_ASPECT
+
+
 static func image_path(id: String) -> String:
 	return IMAGE_DIR + id + ".jpg"
 
 
-## The template image, or null if it is unknown or its image is missing.
+## The template image, or null if it is unknown, missing, or still downloading.
 func texture(id: String) -> Texture2D:
-	if not has(id):
+	if _online.has(id):
+		_connect_cache()
+		return TemplateImageCache.get_instance().get_texture(_online[id]["url"])
+	if not _original_ids.has(id):
 		return null
 	if not _textures.has(id):
 		var path: String = image_path(id)
 		_textures[id] = load(path) as Texture2D if ResourceLoader.exists(path) else null
 	return _textures[id]
+
+
+## True when an online template's image could not be downloaded.
+func image_failed(id: String) -> bool:
+	return _online.has(id) and TemplateImageCache.get_instance().has_failed(_online[id]["url"])
+
+
+func _connect_cache() -> void:
+	if _cache_connected:
+		return
+	_cache_connected = true
+	var cache: TemplateImageCache = TemplateImageCache.get_instance()
+	# Named methods, not lambdas: Godot drops these connections when the library is freed.
+	cache.loaded.connect(_on_image_loaded)
+	cache.failed.connect(_on_image_updated)
+
+
+func _on_image_loaded(url: String, _texture: Texture2D) -> void:
+	_on_image_updated(url)
+
+
+func _on_image_updated(url: String) -> void:
+	for id: String in _online_ids:
+		if _online[id]["url"] == url:
+			image_updated.emit(id)

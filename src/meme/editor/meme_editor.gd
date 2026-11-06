@@ -32,6 +32,7 @@ var _submitted_spec: MemeSpec
 @onready var _done_button: Button = %DoneButton
 @onready var _status_label: Label = %StatusLabel
 @onready var _template_list: ItemList = %TemplateList
+@onready var _hint: Label = %Hint
 
 
 func _ready() -> void:
@@ -46,6 +47,7 @@ func _ready() -> void:
 	_bottom_edit.text_submitted.connect(func(_t: String) -> void: submit())
 	_done_button.pressed.connect(submit)
 	_template_list.item_selected.connect(_on_template_selected)
+	library.image_updated.connect(_on_image_updated)
 	_fill_templates()
 	_update_status()
 	set_time_left(-1.0)
@@ -155,6 +157,15 @@ func _fill_templates() -> void:
 		_template_list.add_item(library.display_name(id), library.texture(id))
 	if library.size() > 0:
 		select_template(library.ids()[0])
+	if library.has_online():
+		# Popular templates are other people's images; say where they come from.
+		_hint.text += "   ·   " + tr("Popular templates via imgflip.com")
+
+
+func _on_image_updated(id: String) -> void:
+	var index: int = library.ids().find(id)
+	if index >= 0 and index < _template_list.item_count:
+		_template_list.set_item_icon(index, library.texture(id))
 
 
 func _on_template_selected(index: int) -> void:
