@@ -32,7 +32,9 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 ```powershell
 .\tools\run_tests.ps1                # import + run all unit tests headless
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
+.\tools\smoke_test.ps1 -Clients 3 -FullGame   # ...and bots play a whole match to GAME_OVER
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
+.\tools\run_local.ps1 -Bots -FastRounds      # play the host against bot clients
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
 .\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 .\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
@@ -42,8 +44,8 @@ To look at the 3D room without networking: `--room-preview=<n> [--room-camera=se
 (`editor` starts zoomed into your CRT's meme editor).
 To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
 
-Run `run_tests.ps1` before every commit and `smoke_test.ps1` before merging networking
-changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
+Run `run_tests.ps1` before every commit and `smoke_test.ps1` (both modes) before merging
+networking changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
 `src/util/launch_options.gd` and the README.
 
 Godot headless output can be very large; when running it from PowerShell, redirect to a
@@ -81,6 +83,9 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     per-player view with hidden information removed; never send anything else to clients.
   - `Scoring`: score formula and elimination choice. `GameConfig` (Resource): all tunables.
   - `MemeSpec`, `PlayerState`, `PromptDeck` (packs in `data/prompts/*.json`), `LobbyState`.
+  - `MatchView`: a client's parsed snapshot plus the client-side copies of the vote/shoot
+    rules. The presentation diffs a view against the previous one to find shots, deaths
+    and new spotlights, so the server sends no separate events.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`
@@ -90,12 +95,17 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   - `ServerController` (host only) owns the authoritative state, validates every intent
     (RPC arguments arrive as `Variant` and are type-checked), and emits signals saying what
     to broadcast. It never touches the network, so it is unit-tested directly.
+    It owns the `GameMatch`: Session calls `update(now)` and `flush()` every frame, and any
+    change (phase, intent, player leaving) emits one `match_changed` per frame, on which
+    Session sends every player their own `snapshot_for(id, now)`.
   - `Session` autoload is the RPC bridge on every peer: client→server intents via
     `rpc_id(1, …)`, server→client snapshots via `rpc_id(peer, …)`. The host calls
     `ServerController` directly instead of sending RPCs to itself. Clients keep a read-only
-    mirror (`Session.lobby`) rebuilt from snapshots, and the UI only reads that mirror.
-  - Clients send **intents** only (`request_join`, `set_ready`, later `submit_meme`,
-    `cast_vote`, `shoot`…), never state. `server_relay` is off: clients never talk to each other.
+    mirror (`Session.lobby`, `Session.match_view`) rebuilt from snapshots, and the UI only
+    reads that mirror (`Session.match_updated(view, previous)`). Clients count `time_left`
+    down locally; the editor auto-submits `auto_submit_lead` seconds before the deadline.
+  - Clients send **intents** only (`request_join`, `set_ready`, `submit_meme`,
+    `cast_vote`, `shoot`, the host's `return_to_lobby`), never state. `server_relay` is off: clients never talk to each other.
   - All RPC method names and payload shapes are listed in `src/net/protocol.gd`. Bump
     `Protocol.VERSION` when any of them change.
   - `JoinCode` turns IPv4 + port into a 10-character code (Crockford base32). It is a
@@ -117,14 +127,21 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   tinted per seat by vertex-colour clothing masks, wearing the artist's hat on its Head bone), keyboard, `CrtMonitor` and
   `WristChain`s. `CameraRig` glides between seat, TV and overview poses with mouse drift.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
-  export, never from hand-tuned numbers. The room only reads Session state; M5 drives
-  `focus_spotlight()`, flinches and deaths from snapshots.
+  export, never from hand-tuned numbers. The room only reads Session state.
+  `room/MatchPresenter` drives it from `MatchView`s: TV captions and memes, spotlight,
+  camera views, the host's face, the editor's lock and timer, muzzle flashes
+  (`Seat.flash_shot`) and deaths (`PlayerAvatar.die`: puff, slump over the keyboard).
   `MemeStation` (local seat only) puts the `MemeEditor` in a `SubViewport` that is the
   picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
   `FILL` of the view, then shows the same texture fullscreen through `crt_overlay.gdshader`
   and forwards input (`push_input`, mouse mapped through `CrtMonitor.curve_uv`, the same
   barrel curve as both shaders, so nothing jumps). Escape reverses it. The wall TV's
   picture is a `SubViewport` too (`WallTv.show_meme()` / `show_caption()`).
+- **`src/ui/`** — main menu, lobby, and `hud/MatchHud` in the room: round, phase, timer,
+  bullets, vote/shoot buttons (keys 1, 2, Space), shot toasts, results and the win screen
+  (the host's *Play again* returns everyone to the lobby).
+- **`src/util/`** — `LaunchOptions` and `AutoPlayer`, the `--auto-play` bot used by the
+  full-game smoke test (random template, random votes, sometimes shoots).
 - **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
   sharing a base class, registered with the server so it can validate their intents.
 - **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).
@@ -157,12 +174,14 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - [x] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up,
   join rejection (version/full/started/timeout), local multi-instance + smoke test scripts.
 - [x] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win,
-  disconnects, per-player snapshots, default prompt pack. Not wired to the network yet (M5).
+  disconnects, per-player snapshots, default prompt pack.
 - [x] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig,
   the artist's player model rigged/animated via `tools/build_models.ps1`, `--room-preview`.
 - [x] **M4** Meme editor + CRT zoom transition: 8 original templates from our own room, editor
-  with live preview and auto-submit, zoom with input hand-off. Submits stay local until M5.
-- [ ] **M5** Full round loop wired end to end, win screen
+  with live preview and auto-submit, zoom with input hand-off.
+- [x] **M5** Full round loop wired end to end: per-player snapshots (protocol v2), HUD with
+  voting/shooting, presenter choreography, deaths, win screen, play again, bot players and
+  a full-game smoke test.
 - [ ] **M6** Hardening (disconnects, timeouts), SFX, Windows build, playtest
 - Post-MVP: Steam (GodotSteam), ghosts, activities, HP mode, GIFs, prompt packs, Linux/macOS
 
@@ -198,3 +217,6 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - Accessories (the hat) are fitted to the body in Blender and exported in the player's
   rest-pose model space; Godot only attaches them to a bone. Refitting never needs
   hand-tuned offsets in Godot. The local player's own hat is shadow-only in first person.
+- Match state reaches clients only as full per-player snapshots, never as events. Effects
+  (shots, deaths, new spotlights) come from diffing two views, so a late or reconnecting
+  client just shows the current state, and a lost snapshot is healed by the next one.
