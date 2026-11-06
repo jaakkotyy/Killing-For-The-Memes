@@ -2,6 +2,7 @@ extends Node3D
 ## The 3D room (M3 greybox): a round table with one seat per player, the wall TV, the host,
 ## a flickering lamp and a spotlight. Reads players from the Session mirror and never
 ## changes game state itself; M5 drives the spotlight, flinches and deaths from snapshots.
+## The local player's MemeStation puts the meme editor on their CRT (M4).
 ##
 ## `--room-preview=<n>` opens this scene directly with n fake players (no network).
 
@@ -28,6 +29,11 @@ var _lamp: OmniLight3D
 var _lamp_time: float = 0.0
 var _tv: WallTv
 var _host: TheHost
+var _station: MemeStation
+## Set false before adding the room to stop the preview's spotlight demo (staged shots).
+var demo_enabled: bool = true
+## Fake players for a preview room; -1 means use the --room-preview launch flag.
+var preview_players: int = -1
 
 @onready var _camera: CameraRig = %CameraRig
 @onready var _spotlight: SpotLight3D = %Spotlight
@@ -50,15 +56,40 @@ func _ready() -> void:
 
 	var players: Array[LobbyPlayer] = _players()
 	_build_seats(players)
+	_build_station()
 	_spotlight.visible = false
 
 	_leave_button.pressed.connect(_on_leave_pressed)
-	_hint_label.visible = OS.is_debug_build()
 	if _is_preview():
-		_start_demo()
+		if demo_enabled:
+			_start_demo()
 	else:
 		Session.lobby_updated.connect(_on_lobby_updated)
 	_set_view(_initial_view(), 0.0)
+	if _station != null and App.options != null and App.options.room_camera == "editor":
+		_station.open(true)
+
+
+## The local player's editor and CRT zoom. Until the round loop (M5) the prompt and the
+## countdown are local placeholders, and submitting only shows the meme on the wall TV.
+func _build_station() -> void:
+	var seat: Seat = _seats.get(_local_id) as Seat
+	if seat == null:
+		return
+	_station = MemeStation.new()
+	add_child(_station)
+	_station.setup(_camera, seat)
+	var file := FileAccess.open("res://data/prompts/default.json", FileAccess.READ)
+	var deck: PromptDeck = PromptDeck.from_json(file.get_as_text() if file != null else "")
+	_station.editor.set_prompt(deck.draw() if deck.size() > 0 else tr("Make a meme!"))
+	_station.editor.set_time_left(GameConfig.new().create_duration)
+	_station.meme_submitted.connect(_on_meme_submitted)
+	_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
+
+
+func _on_meme_submitted(spec: MemeSpec) -> void:
+	print("[Room] Meme submitted: %s" % spec.to_dict())
+	_tv.show_meme(spec)
 
 
 ## Preview only: the spotlight hops between players, who flinch when it lands on them,
@@ -96,6 +127,18 @@ func get_seat(player_id: int) -> Seat:
 	return _seats.get(player_id) as Seat
 
 
+func get_host() -> TheHost:
+	return _host
+
+
+func get_tv() -> WallTv:
+	return _tv
+
+
+func set_hud_visible(on: bool) -> void:
+	%Hud.visible = on
+
+
 func _process(delta: float) -> void:
 	_lamp_time += delta
 	# A tired bulb: steady hum with the occasional stutter.
@@ -104,6 +147,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _station != null and _station.is_open():
+		return
 	if not OS.is_debug_build() or not event is InputEventKey or not event.is_pressed() or event.is_echo():
 		return
 	match (event as InputEventKey).keycode:
@@ -128,6 +173,9 @@ func _set_view(view: View, duration: float) -> void:
 	if seat == null and view != View.OVERVIEW:
 		view = View.OVERVIEW
 	_view = view
+	if _station != null:
+		_station.enabled = view == View.SEAT
+	_update_hint()
 	match view:
 		View.SEAT:
 			_camera.move_to(seat.get_eye_pose(), 62.0, duration, true)
@@ -135,6 +183,18 @@ func _set_view(view: View, duration: float) -> void:
 			_camera.move_to(CameraRig.pose_looking_at(seat.get_eye_position(), TV_POSITION), 45.0, duration, true)
 		View.OVERVIEW:
 			_camera.move_to(CameraRig.pose_looking_at(OVERVIEW_EYE, OVERVIEW_TARGET), 62.0, duration, false)
+
+
+func _update_hint() -> void:
+	var parts: PackedStringArray = []
+	if _station != null and _station.is_open():
+		parts.append(tr("Esc: look up"))
+	else:
+		if _station != null and _view == View.SEAT:
+			parts.append(tr("E or click your monitor: make a meme"))
+		if OS.is_debug_build():
+			parts.append(tr("Dev keys: Tab camera · F flinch · G spotlight"))
+	_hint_label.text = "   ·   ".join(parts)
 
 
 func _initial_view() -> View:
@@ -147,14 +207,20 @@ func _initial_view() -> View:
 
 
 func _is_preview() -> bool:
-	return App.options != null and App.options.room_preview > 0
+	return _preview_count() > 0
+
+
+func _preview_count() -> int:
+	if preview_players >= 0:
+		return preview_players
+	return App.options.room_preview if App.options != null else 0
 
 
 func _players() -> Array[LobbyPlayer]:
 	if _is_preview():
 		var fake: Array[LobbyPlayer] = []
 		var names: PackedStringArray = ["You", "Bertha", "Gus", "Mildred", "Vlad", "Pickles", "Dot", "Reginald"]
-		for i: int in mini(App.options.room_preview, Protocol.MAX_PLAYERS):
+		for i: int in mini(_preview_count(), Protocol.MAX_PLAYERS):
 			fake.append(LobbyPlayer.new(i + 1, names[i], i))
 		_local_id = 1
 		return fake

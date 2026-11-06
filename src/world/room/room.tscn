@@ -26,6 +26,7 @@ spot_angle = 11.0
 spot_angle_attenuation = 0.6
 
 [node name="Hud" type="CanvasLayer" parent="."]
+unique_name_in_owner = true
 
 [node name="HintLabel" type="Label" parent="Hud"]
 unique_name_in_owner = true
@@ -39,7 +40,7 @@ offset_bottom = -24.0
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.65, 0.6, 0.8)
 theme_override_font_sizes/font_size = 22
-text = "Dev keys:  Tab camera  ·  F flinch  ·  G spotlight"
+text = ""
 
 [node name="LeaveButton" type="Button" parent="Hud"]
 unique_name_in_owner = true
