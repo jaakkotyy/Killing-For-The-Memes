@@ -88,6 +88,31 @@ func set_captions(top: String, bottom: String) -> void:
 	_on_text_changed()
 
 
+## Stops typing and clicking (e.g. once creation is over or for spectators).
+func set_locked(locked: bool) -> void:
+	for control: Control in [_top_edit, _bottom_edit, _done_button, _template_list]:
+		control.mouse_filter = Control.MOUSE_FILTER_IGNORE if locked else Control.MOUSE_FILTER_STOP
+	_top_edit.editable = not locked
+	_bottom_edit.editable = not locked
+	_done_button.disabled = locked
+	if locked:
+		_status_label.text = tr("Time's up.") if _has_submitted else tr("Waiting for the next round.")
+	else:
+		_update_status()
+
+
+## A fresh draft for a new round: first template, empty captions, nothing submitted.
+func reset() -> void:
+	_has_submitted = false
+	_submitted_spec = null
+	set_time_left(-1.0)
+	_top_edit.text = ""
+	_bottom_edit.text = ""
+	if library.size() > 0:
+		select_template(library.ids()[0])
+	_update_status()
+
+
 ## Puts the keyboard focus in the first caption field (called after zooming in).
 func focus_first_field() -> void:
 	_top_edit.grab_focus()
