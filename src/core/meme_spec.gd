@@ -39,11 +39,16 @@ static func from_untrusted(data: Variant, allowed_templates: PackedStringArray =
 	if typeof(template) != TYPE_STRING:
 		return null
 	var template_text: String = template
-	if RegEx.create_from_string(_TEMPLATE_ID_PATTERN).search(template_text) == null:
+	if not is_valid_template_id(template_text):
 		return null
 	if not allowed_templates.is_empty() and not allowed_templates.has(template_text):
 		return null
 	return MemeSpec.new(template_text, sanitize_caption(dict.get("top_text", "")), sanitize_caption(dict.get("bottom_text", "")))
+
+
+## True for a well-formed template id (a short lowercase slug).
+static func is_valid_template_id(id: String) -> bool:
+	return RegEx.create_from_string(_TEMPLATE_ID_PATTERN).search(id) != null
 
 
 ## Trusted counterpart of to_dict(), for snapshots coming from the server.
