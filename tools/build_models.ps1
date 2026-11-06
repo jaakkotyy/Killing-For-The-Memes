@@ -6,7 +6,7 @@
 #   .\tools\build_models.ps1                         # full build, including the bakes (~1 min)
 #   .\tools\build_models.ps1 -SkipBake               # reuse the committed normal/AO maps
 #   .\tools\build_models.ps1 -Preview C:\tmp\prev    # also render pose previews (PNG)
-#   .\tools\build_models.ps1 -PropsOnly              # only the table props (cup, can, beer)
+#   .\tools\build_models.ps1 -PropsOnly              # skip the player: hat and table props only
 #
 # Sources: -AssetsDir, else $env:KFTM_ASSETS, else D:\Killing-For-The-Memes-Assets.
 # Blender 2.81+: -Blender, else $env:BLENDER, else D:\Blender\blender.exe.
@@ -49,6 +49,14 @@ if (-not $PropsOnly) {
     if ($Preview) { $blenderArgs += @("--preview", "`"$(Join-Path $Preview 'player')`"") }
     Invoke-BlenderExport "player from '$playerSource'" $blenderArgs (Join-Path $env:TEMP "kftm_build_player.log") "WROTE|SKIN|SEAT|ACTION"
 }
+
+# The hat is fitted to the head ring in player_metrics.json, so it comes after the player.
+$hatSource = Join-Path $AssetsDir "Hat - Accessory.blend"
+if (-not (Test-Path $hatSource)) { Write-Error "Source not found: '$hatSource'. Pass -AssetsDir or set `$env:KFTM_ASSETS."; exit 1 }
+$playerDir = Join-Path $ProjectRoot "assets\models\player"
+$hatArgs = @("-b", "--factory-startup", "`"$hatSource`"", "--python", "`"$(Join-Path $PSScriptRoot 'blender\build_hat.py')`"", "--",
+    "--metrics", "`"$(Join-Path $playerDir 'player_metrics.json')`"", "--out", "`"$playerDir`"")
+Invoke-BlenderExport "hat" $hatArgs (Join-Path $env:TEMP "kftm_build_hat.log") "WROTE|HAT"
 
 # Table props: one small source file each; build_props.py lists which objects to use.
 $propsDir = Join-Path $ProjectRoot "assets\models\props"

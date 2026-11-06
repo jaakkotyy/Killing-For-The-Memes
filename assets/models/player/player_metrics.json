@@ -23,6 +23,16 @@
 		0.7899,
 		0.3389
 	],
+	"hat_band": {
+		"center": [
+			0.0,
+			1.7284,
+			0.0169
+		],
+		"width": 0.1493,
+		"depth": 0.1933,
+		"head_top": 1.8
+	},
 	"animations": [
 		"seated_idle",
 		"flinch",
