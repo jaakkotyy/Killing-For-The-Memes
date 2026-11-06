@@ -43,6 +43,17 @@ func test_parses_a_real_snapshot() -> void:
 	assert_eq(view.spotlight_id, 0)
 
 
+func test_a_host_paced_spotlight_has_no_timer() -> void:
+	var view := MatchView.from_snapshot({"phase": GameMatch.Phase.SPOTLIGHT, "time_left": -1.0,
+		"spotlight": {"player_id": 2, "index": 0, "count": 3, "judged": 1, "judges": 2}}, 5.0)
+	assert_false(view.timed)
+	assert_eq(view.time_left_at(9.0), 0.0)
+	assert_eq(view.judged, 1)
+	assert_eq(view.judges, 2)
+	var timed := MatchView.from_snapshot({"phase": GameMatch.Phase.SPOTLIGHT, "time_left": 4.0}, 5.0)
+	assert_true(timed.timed)
+
+
 func test_parses_spotlight_fields() -> void:
 	var view: MatchView = _spotlight_view(4, [1])
 	assert_eq(view.spotlight_id, 4)

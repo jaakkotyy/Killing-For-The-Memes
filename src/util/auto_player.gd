@@ -4,7 +4,8 @@ extends Node
 ## testing by hand with a few windows.
 ##
 ## Each round it submits a random template with a caption, votes on every spotlight it can
-## and now and then spends a bullet.
+## and now and then spends a bullet. A bot host presents the memes too, moving on after
+## the config's spotlight_duration.
 
 const SHOOT_CHANCE: float = 0.3
 ## Reaction delay range, so bots don't all act on the same frame.
@@ -31,9 +32,13 @@ func _on_match_updated(view: MatchView, _previous: MatchView) -> void:
 				_after_delay(_submit.bind(view.round_number))
 		GameMatch.Phase.SPOTLIGHT:
 			var key: String = "%d:%d" % [view.round_number, view.spotlight_index]
-			if not _handled_spotlights.has(key) and view.spotlight_id != me:
+			if not _handled_spotlights.has(key):
 				_handled_spotlights[key] = true
-				_after_delay(_judge.bind(key))
+				if view.spotlight_id != me:
+					_after_delay(_judge.bind(key))
+				if Session.is_host() and not view.timed:
+					var pace: float = float(Session.match_config.get("spotlight_duration", 2.0))
+					get_tree().create_timer(pace).timeout.connect(_present_next.bind(key))
 
 
 func _submit(round_number: int) -> void:
@@ -55,6 +60,13 @@ func _judge(key: String) -> void:
 	if view.can_shoot(me) and _rng.randf() < SHOOT_CHANCE:
 		print("[AutoPlayer] Shooting %s" % view.player_name(view.spotlight_id))
 		Session.shoot()
+
+
+func _present_next(key: String) -> void:
+	var view: MatchView = Session.match_view
+	if view != null and view.phase == GameMatch.Phase.SPOTLIGHT \
+			and "%d:%d" % [view.round_number, view.spotlight_index] == key:
+		Session.present_next()
 
 
 func _after_delay(callback: Callable) -> void:

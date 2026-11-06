@@ -143,6 +143,18 @@ func shoot() -> void:
 		_rpc_shoot.rpc_id(1)
 
 
+## Host only: the next meme, or the results after the last one. Only the host presents,
+## and the host runs the server, so this never goes over the network.
+func present_next() -> void:
+	if is_host() and match_view != null:
+		_server.handle_present_next(local_peer_id(), match_view.spotlight_index, _clock)
+
+
+## Whether the host presents the memes at their own pace (no spotlight timer).
+func host_paces_spotlight() -> bool:
+	return bool(match_config.get("host_paces_spotlight", false))
+
+
 ## Host only, after the game is over: back to the lobby with the same players.
 func return_to_lobby() -> void:
 	if is_host():

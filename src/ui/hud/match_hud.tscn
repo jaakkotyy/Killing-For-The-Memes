@@ -125,6 +125,14 @@ layout_mode = 2
 focus_mode = 0
 text = "SHOOT  [Space]"
 
+[node name="NextButton" type="Button" parent="Root/ActionBar/ActionBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+text = "NEXT MEME  [Enter]"
+
 [node name="ResultsPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 1

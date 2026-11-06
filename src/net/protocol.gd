@@ -24,8 +24,11 @@ extends RefCounted
 ## disconnect), at most once per frame. Clients count time_left down locally in between.
 ##
 ## The host has no RPC round trip to itself: Session calls ServerController directly.
+## Host-only actions (start, present the next meme, back to the lobby) therefore need no
+## RPC at all. A snapshot's time_left is -1 when the phase has no timer (the host is
+## presenting at their own pace; GameConfig.host_paces_spotlight).
 
-const VERSION: int = 4
+const VERSION: int = 5
 
 const DEFAULT_PORT: int = 7777
 const MAX_PLAYERS: int = 8

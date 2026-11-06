@@ -10,6 +10,7 @@ var server: ServerController
 func before_each() -> void:
 	server = ServerController.new(3, 4)
 	server.rng_seed = 42
+	server.config.host_paces_spotlight = false  # most tests run the spotlight on its timer
 	server.allowed_templates = PackedStringArray(["sad_clown"])
 	for id: int in [1, 2, 3]:
 		server.handle_peer_connected(id, 0.0)
@@ -111,6 +112,26 @@ func test_disconnect_mid_game_removes_the_player_from_the_match() -> void:
 	server.handle_peer_disconnected(3, 1.0)
 	assert_eq(server.game_match.get_player(3).status, PlayerState.Status.LEFT)
 	assert_false(server.lobby.has_player(3))
+
+
+func test_only_the_host_presents_the_next_meme() -> void:
+	server.config.host_paces_spotlight = true
+	_start()
+	_run_to(GameMatch.Phase.CREATE)
+	for id: int in [1, 2, 3]:
+		server.handle_submit_meme(id, MEME, 1.0)
+	assert_eq(server.game_match.phase, GameMatch.Phase.SPOTLIGHT)
+	var first: int = server.game_match.current_spotlight_id()
+	server.update(10000.0)
+	assert_eq(server.game_match.current_spotlight_id(), first, "no timer: the meme stays up")
+	assert_eq(server.snapshot_for(2, 10000.0)["time_left"], -1.0)
+	assert_eq(server.handle_present_next(2, 0, 10000.0), GameMatch.IntentResult.NOT_ALLOWED)
+	assert_eq(server.game_match.current_spotlight_id(), first)
+	server.flush()
+	assert_eq(server.handle_present_next(1, 0, 10000.0), GameMatch.IntentResult.OK)
+	assert_ne(server.game_match.current_spotlight_id(), first)
+	server.flush()
+	assert_signal_emit_count(server, "match_changed", 3, "start, the memes, the next spotlight")
 
 
 func test_return_to_lobby_only_after_game_over_and_only_by_host() -> void:

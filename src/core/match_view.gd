@@ -11,6 +11,8 @@ var round_number: int = 0
 var prompt: String = ""
 ## Seconds left in the phase when the snapshot was sent; see time_left_at().
 var time_left: float = 0.0
+## False when the phase has no timer (the host presents the memes at their own pace).
+var timed: bool = true
 ## Local clock (Session's) when the snapshot arrived.
 var received_at: float = 0.0
 ## Ordered by seat.
@@ -27,6 +29,9 @@ var shooters: Array[int] = []
 ## 0-based position of this spotlight in the round, and how many there are.
 var spotlight_index: int = 0
 var spotlight_count: int = 0
+## Votes cast on the current spotlight, and how many could vote (counts only).
+var judged: int = 0
+var judges: int = 0
 ## Your vote on the current spotlight: +1, -1 or 0.
 var my_vote: int = 0
 ## The most recent elimination (ELIMINATION and GAME_OVER only); 0 when there is none.
@@ -44,7 +49,9 @@ static func from_snapshot(data: Dictionary, p_received_at: float) -> MatchView:
 	view.phase = clampi(int(data.get("phase", 0)), 0, GameMatch.Phase.size() - 1) as GameMatch.Phase
 	view.round_number = int(data.get("round", 0))
 	view.prompt = str(data.get("prompt", ""))
-	view.time_left = maxf(0.0, float(data.get("time_left", 0.0)))
+	var time_left_value: float = float(data.get("time_left", 0.0))
+	view.timed = time_left_value >= 0.0
+	view.time_left = maxf(0.0, time_left_value)
 	view.received_at = p_received_at
 	for entry: Variant in data.get("players", []):
 		if entry is Dictionary:
@@ -62,6 +69,8 @@ static func from_snapshot(data: Dictionary, p_received_at: float) -> MatchView:
 		view.shooters.assign(_int_array(s.get("shooters", [])))
 		view.spotlight_index = int(s.get("index", 0))
 		view.spotlight_count = int(s.get("count", 0))
+		view.judged = int(s.get("judged", 0))
+		view.judges = int(s.get("judges", 0))
 	view.my_vote = clampi(int(data.get("my_vote", 0)), -1, 1)
 	var elimination: Variant = data.get("elimination", {})
 	if elimination is Dictionary and not (elimination as Dictionary).is_empty():

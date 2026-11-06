@@ -17,13 +17,17 @@ func _make_match(player_count: int, rng: RandomNumberGenerator) -> GameMatch:
 func _random_intents(game: GameMatch, rng: RandomNumberGenerator, player_count: int, now: float) -> void:
 	for i: int in range(rng.randi_range(0, 6)):
 		var actor: int = rng.randi_range(0, player_count + 1)  # Includes ids that don't exist.
-		match rng.randi_range(0, 2):
+		match rng.randi_range(0, 3):
 			0:
 				game.submit_meme(actor, {"template_id": TEMPLATES[rng.randi_range(0, TEMPLATES.size() - 1)], "top_text": "hi"}, now)
 			1:
 				game.cast_vote(actor, rng.randi_range(-2, 2), now)
 			2:
 				game.shoot(actor, now)
+			3:
+				# The host moves on, sometimes from a stale or nonsense index.
+				var index: int = game.current_spotlight_index() + rng.randi_range(-1, 1)
+				game.present_next(index if rng.randf() < 0.9 else "next", now)
 
 
 func _check_invariants(game: GameMatch, player_count: int, bullets_at_start: int) -> void:

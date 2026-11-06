@@ -4,8 +4,8 @@ extends RefCounted
 ## repeated until one player is left. Pure logic, so it is fully unit-testable:
 ##   - time is passed in as `now` (seconds, any monotonic clock); nothing reads the real clock
 ##   - randomness comes from an injected RandomNumberGenerator
-##   - player input arrives as intents (submit_meme, cast_vote, shoot) that return an
-##     IntentResult and never trust their arguments
+##   - player input arrives as intents (submit_meme, cast_vote, shoot, present_next) that
+##     return an IntentResult and never trust their arguments
 ## The server calls update(now) every frame and broadcasts to_snapshot() to each peer.
 
 signal phase_changed(phase: Phase)
@@ -68,8 +68,9 @@ func start(now: float) -> void:
 
 
 ## Advances through every phase whose time is up. Call every frame on the server.
+## Untimed phases (a host-paced spotlight) never end here, whatever `now` is.
 func update(now: float) -> void:
-	while _is_running() and now >= phase_ends_at:
+	while _is_running() and not is_inf(phase_ends_at) and now >= phase_ends_at:
 		_advance(now)
 
 
@@ -124,6 +125,26 @@ func shoot(shooter_id: int, _now: float) -> IntentResult:
 	return IntentResult.OK
 
 
+## The presenter (the hosting player; ServerController checks who) moves on from the meme
+## on the wall TV: to the next one, or to the results after the last. [param from_index]
+## is the spotlight index they were looking at, so a double press or a press that crosses
+## a timeout never skips a meme.
+func present_next(from_index: Variant, now: float) -> IntentResult:
+	if phase != Phase.SPOTLIGHT:
+		return IntentResult.WRONG_PHASE
+	if typeof(from_index) != TYPE_INT:
+		return IntentResult.INVALID
+	if from_index != _spotlight_index:
+		return IntentResult.ALREADY_DONE
+	_next_spotlight(now)
+	return IntentResult.OK
+
+
+## Whether the current phase runs until someone acts instead of on a timer.
+func is_untimed() -> bool:
+	return _is_running() and is_inf(phase_ends_at)
+
+
 ## A player disconnected. They are out for good; the game carries on without them.
 ## Leaving does not replace the round's elimination: the worst meme still dies.
 func remove_player(player_id: int, now: float) -> void:
@@ -168,6 +189,11 @@ func current_spotlight_id() -> int:
 	return _spotlight_order[_spotlight_index]
 
 
+## Position of the current spotlight in this round's order (-1 before the first).
+func current_spotlight_index() -> int:
+	return _spotlight_index
+
+
 func get_submission(player_id: int) -> MemeSpec:
 	return _submissions.get(player_id)
 
@@ -195,7 +221,8 @@ func to_snapshot(now: float, viewer_id: int) -> Dictionary:
 		"phase": phase,
 		"round": round_number,
 		"prompt": prompt,
-		"time_left": maxf(0.0, phase_ends_at - now) if _is_running() else 0.0,
+		# -1: no timer (the host presents at their own pace).
+		"time_left": -1.0 if is_untimed() else (maxf(0.0, phase_ends_at - now) if _is_running() else 0.0),
 		"players": players,
 		"submitted": submitted,
 		"my_meme": _submissions[viewer_id].to_dict() if _submissions.has(viewer_id) else {},
@@ -210,12 +237,19 @@ func to_snapshot(now: float, viewer_id: int) -> Dictionary:
 		var meme: MemeSpec = _submissions.get(target, MemeSpec.new())
 		var shooters: Array[int] = []
 		shooters.assign(_shots.get(target, []))
+		# How many have voted, never who or how: lets the host see when to move on.
+		var judges: int = 0
+		for player: PlayerState in _players.values():
+			if player.id != target and _can_vote(player.id):
+				judges += 1
 		snapshot["spotlight"] = {
 			"player_id": target,
 			"meme": meme.to_dict(),
 			"shooters": shooters,
 			"index": _spotlight_index,
 			"count": _spotlight_order.size(),
+			"judged": (_votes.get(target, {}) as Dictionary).size(),
+			"judges": judges,
 		}
 		snapshot["my_vote"] = int(_votes.get(target, {}).get(viewer_id, 0))
 
@@ -273,7 +307,7 @@ func _next_spotlight(now: float) -> void:
 	if _spotlight_index >= _spotlight_order.size():
 		_resolve_round(now)
 	else:
-		_set_phase(Phase.SPOTLIGHT, now + config.spotlight_duration)
+		_set_phase(Phase.SPOTLIGHT, INF if config.host_paces_spotlight else now + config.spotlight_duration)
 
 
 func _resolve_round(now: float) -> void:

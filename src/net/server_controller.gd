@@ -130,6 +130,15 @@ func handle_shoot(peer_id: int, now: float) -> GameMatch.IntentResult:
 	return _after_intent(game_match.shoot(peer_id, now))
 
 
+## Host only: moves on from the meme on the wall TV (see GameMatch.present_next).
+func handle_present_next(peer_id: int, from_index: Variant, now: float) -> GameMatch.IntentResult:
+	if game_match == null:
+		return GameMatch.IntentResult.WRONG_PHASE
+	if peer_id != LobbyState.HOST_ID:
+		return GameMatch.IntentResult.NOT_ALLOWED
+	return _after_intent(game_match.present_next(from_index, now))
+
+
 ## Host only, once the game is over: everyone goes back to the lobby to play again.
 func handle_return_to_lobby(peer_id: int) -> void:
 	if peer_id != LobbyState.HOST_ID or game_match == null or game_match.phase != GameMatch.Phase.GAME_OVER:

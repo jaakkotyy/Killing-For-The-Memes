@@ -5,7 +5,8 @@ extends CanvasLayer
 ## A view over Session.match_view; every action goes through Session.
 ##
 ## Keys during a spotlight: 1 = good, 2 = bad (press again to take the vote back),
-## Space = shoot.
+## Space = shoot. The host presents the memes at their own pace: Enter (or the button)
+## moves on to the next meme, and after the last one to the results.
 
 const BANNER_SECONDS: float = 2.5
 const TOAST_SECONDS: float = 2.0
@@ -30,6 +31,7 @@ var _toast_tween: Tween
 @onready var _up_button: Button = %UpButton
 @onready var _down_button: Button = %DownButton
 @onready var _shoot_button: Button = %ShootButton
+@onready var _next_button: Button = %NextButton
 @onready var _results_panel: Control = %ResultsPanel
 @onready var _results_list: VBoxContainer = %ResultsList
 @onready var _win_panel: Control = %WinPanel
@@ -48,7 +50,7 @@ static func reason_text(reason: int) -> String:
 		Scoring.Reason.TIE_BULLETS:
 			return TranslationServer.translate("Tied for the worst meme and took the most bullets.")
 		Scoring.Reason.TIE_RANDOM:
-			return TranslationServer.translate("Tied for the worst meme. The host chose.")
+			return TranslationServer.translate("Tied for the worst meme. Fate chose.")
 	return TranslationServer.translate("Worst meme of the round.")
 
 
@@ -57,6 +59,7 @@ func _ready() -> void:
 	_up_button.pressed.connect(_vote.bind(1))
 	_down_button.pressed.connect(_vote.bind(-1))
 	_shoot_button.pressed.connect(_shoot)
+	_next_button.pressed.connect(_present_next)
 	_lobby_button.pressed.connect(Session.return_to_lobby)
 	_menu_button.pressed.connect(Session.leave)
 	_banner.modulate.a = 0.0
@@ -74,7 +77,7 @@ func _process(_delta: float) -> void:
 	if _view == null:
 		return
 	var running: bool = _view.phase != GameMatch.Phase.GAME_OVER and _view.phase != GameMatch.Phase.WAITING
-	_timer_label.visible = running
+	_timer_label.visible = running and _view.timed
 	var seconds: int = ceili(Session.match_time_left())
 	_timer_label.text = "%d:%02d" % [seconds / 60, seconds % 60]
 
@@ -91,6 +94,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_vote(-1)
 		KEY_SPACE:
 			_shoot()
+		KEY_ENTER, KEY_KP_ENTER:
+			if not _next_button.visible:
+				return
+			_present_next()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -138,11 +145,24 @@ func _update_actions(view: MatchView) -> void:
 	_action_bar.visible = view.phase == GameMatch.Phase.SPOTLIGHT
 	if not _action_bar.visible:
 		return
+	var presenting: bool = Session.is_host() and not view.timed
+	_next_button.visible = presenting
+	var last: bool = view.spotlight_index + 1 >= view.spotlight_count
+	_next_button.text = tr("SHOW RESULTS  [Enter]") if last else tr("NEXT MEME  [Enter]")
+	_action_status.text = _judging_text(view)
+	if presenting:
+		_action_status.text += "\n" + tr("%d/%d have judged. Move on when you like.") % [view.judged, view.judges]
+	elif not view.timed:
+		_action_status.text += "\n" + tr("The host moves on when everyone has judged.")
+
+
+## What the local player can do about the meme on the TV; also shows or hides the vote
+## and shoot buttons.
+func _judging_text(view: MatchView) -> String:
 	var me: int = Session.local_peer_id()
 	if view.spotlight_id == me:
-		_action_status.text = tr("You are in the spotlight. Look innocent.")
 		_action_buttons.visible = false
-		return
+		return tr("You are in the spotlight. Look innocent.")
 	var can_vote: bool = view.can_vote(me, Session.eliminated_can_vote())
 	var can_shoot: bool = view.can_shoot(me)
 	_action_buttons.visible = can_vote or can_shoot
@@ -155,11 +175,10 @@ func _update_actions(view: MatchView) -> void:
 	_shoot_button.disabled = not can_shoot
 	_shoot_button.text = tr("SHOOT  [Space]  %d left") % bullets
 	if not can_vote and not can_shoot:
-		_action_status.text = tr("You can only watch now.")
-	elif view.shooters.has(me):
-		_action_status.text = tr("You shot %s.") % view.player_name(view.spotlight_id)
-	else:
-		_action_status.text = tr("Judge %s's meme.") % view.player_name(view.spotlight_id)
+		return tr("You can only watch now.")
+	if view.shooters.has(me):
+		return tr("You shot %s.") % view.player_name(view.spotlight_id)
+	return tr("Judge %s's meme.") % view.player_name(view.spotlight_id)
 
 
 ## Big text when a phase starts, and a toast for every new shot.
@@ -232,6 +251,11 @@ func _vote(value: int) -> void:
 		return
 	# Pressing your current vote again takes it back.
 	Session.cast_vote(0 if _view.my_vote == value else value)
+
+
+func _present_next() -> void:
+	if _view != null and _view.phase == GameMatch.Phase.SPOTLIGHT and Session.is_host():
+		Session.present_next()
 
 
 func _shoot() -> void:
