@@ -2,13 +2,25 @@
 # machine, waits until all of them have joined, readied up and seen the game start, and
 # fails if any instance does not get there.
 #
-# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790]
+# -FullGame plays a whole match instead: every instance is a bot (--auto-play) on short
+# timers (--fast-rounds), and each must see GAME_OVER with a winner.
+#
+# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7]
 
 param(
     [ValidateRange(1, 7)][int]$Clients = 2,
     [int]$Port = 7790,
-    [int]$TimeoutSeconds = 45
+    [int]$TimeoutSeconds = 0,
+    [switch]$FullGame,
+    [int]$Seed = 7
 )
+
+if ($TimeoutSeconds -le 0) { $TimeoutSeconds = if ($FullGame) { 150 } else { 45 } }
+$SmokeArgs = if ($FullGame) {
+    @("--smoke-test=game", "--auto-play", "--fast-rounds", "--seed=$Seed")
+} else {
+    @("--smoke-test")
+}
 
 . "$PSScriptRoot\godot_path.ps1"
 
@@ -22,7 +34,7 @@ $MinPlayers = $Clients + 1
 $Instances = @()
 
 function Start-Instance([string]$Name, [string[]]$GameArgs) {
-    $allArgs = @("--headless", "--path", "`"$ProjectRoot`"", "--", "--name=$Name", "--smoke-test", "--min-players=$MinPlayers") + $GameArgs
+    $allArgs = @("--headless", "--path", "`"$ProjectRoot`"", "--", "--name=$Name", "--min-players=$MinPlayers") + $SmokeArgs + $GameArgs
     $log = Join-Path $LogDir "$Name.log"
     $proc = Start-Process -FilePath $Godot -ArgumentList $allArgs -NoNewWindow -PassThru `
         -RedirectStandardOutput $log -RedirectStandardError "$log.err"

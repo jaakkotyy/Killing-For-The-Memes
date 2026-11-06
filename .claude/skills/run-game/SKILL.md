@@ -23,15 +23,21 @@ plain `.exe` for windows the user will look at.
 | Screenshot one screen without disturbing the user's desktop | 4. Offscreen frames |
 | Look at the 3D room, characters, lighting | 5. Room preview |
 | Check the meme editor or the CRT zoom | 6. Meme editor |
+| Does a whole match play out (rounds, deaths, win screen)? | 1. Smoke test `-FullGame`, then 7 |
+| See the round loop: TV, HUD, shots, deaths, win screen | 7. Recorded bot game |
 
-### 1. Smoke test (automated, about 10 s)
+### 1. Smoke test (automated, about 10 s; full game about 30 s)
 
 ```powershell
 .\tools\smoke_test.ps1 -Clients 3
+.\tools\smoke_test.ps1 -Clients 3 -FullGame [-Seed 7]
 ```
 
 Host + N headless clients join, auto-ready and auto-start. Every instance must print
 `SMOKE_TEST PASS: game started` and exit 0. Per-instance logs go to `%TEMP%\kftm_smoke_test\`.
+With `-FullGame` every instance is an `--auto-play` bot on `--fast-rounds` timers and must
+print `SMOKE_TEST PASS: game over after N rounds, winner <name>` (N = players - 1). Also
+search the logs for `SCRIPT ERROR`: the room, presenter and HUD run headless on every peer.
 
 ### 2. Custom headless scenario
 
@@ -48,19 +54,23 @@ wait; grep -h "^\[" "$S"/*.log
 ```
 
 Healthy log lines: `[Net] Hosting via ENet.`, `[Net] Connected as peer <id>.`,
-`[Session] Game started with N players.`, `[Session] Rejecting peer <id>: <reason>`.
+`[Session] Game started with N players.`, `[Session] Rejecting peer <id>: <reason>`,
+`[Session] Round N: CREATE` (one per phase), `[Session] Game over. Winner: <name>`.
 Add `--smoke-test` to an instance to make it exit with 0 on game start and 1 on failure,
 and print the failure reason (for example a join rejection message).
 
 Launch flags (after `--`): `--host`, `--join=<ip|ip:port|code>`, `--name=`, `--port=`,
 `--auto-ready`, `--auto-start`, `--min-players=<n>` (debug builds), `--smoke-test`,
-`--room-preview=<n>`, `--room-camera=seat|tv|overview|editor`.
+`--smoke-test=game` (exit 0 at GAME_OVER), `--auto-play` (bot), `--fast-rounds` (host,
+debug builds: 0.5 / 3 / 1 / 0.8 s phases), `--seed=<n>` (host: same prompts, spotlight
+order and tie-breaks every run), `--room-preview=<n>`, `--room-camera=seat|tv|overview|editor`.
 The source of truth is `src/util/launch_options.gd`.
 
 ### 3. Windowed instances for the user
 
 ```powershell
 .\tools\run_local.ps1 -Clients 2        # host + 2 clients tiled on the primary monitor
+.\tools\run_local.ps1 -Bots -FastRounds # clients play by themselves; the user plays the host
 .\.claude\skills\run-game\scripts\capture_windows.ps1 -OutDir "<scratchpad>"
 ```
 
@@ -113,9 +123,33 @@ With `--room-camera=seat` instead, the same editor is the picture on your CRT in
 To see the zoom itself, start at `seat` and record ~120 frames while pressing **E** in a
 window (or call `MemeStation.open()` from a test). The automated check of typing, clicking
 Done through the curve and Esc is `tests/unit/test_crt_zoom.gd`. A submitted meme prints
-`[Room] Meme submitted: ...` and appears on the wall TV (until M5 sends it to the server).
+`[Room] Meme submitted: ...` and appears on the wall TV. In a real game the presenter
+sends it to the server instead, and the editor is locked outside the creation phase.
 After room or character changes, re-render the templates with `.\tools\capture_templates.ps1`
 and look at the JPGs in `assets/meme_templates/`.
+
+### 7. Recorded bot game (the round loop with your eyes)
+
+One windowed host records frames while headless bots play; everyone is a bot, so the
+recording needs no input. 450 frames at 15 fps cover a 4-player fast game.
+
+```bash
+S="C:/<scratchpad>/m5vis"; mkdir -p "$S"
+"$G" --path . --resolution 960x540 --fixed-fps 15 --write-movie "$S/f.png" --quit-after 450 -- --host --port=7820 --name=Host --auto-start --auto-play --fast-rounds --seed=7 --min-players=4 > "$S/host.log" 2>&1 &
+sleep 2
+for n in Vlad Gus Bertha; do timeout 90 "$GC" --headless --path . -- --join=127.0.0.1:7820 --name=$n --auto-ready --auto-play --min-players=4 > "$S/$n.log" 2>&1 & done
+wait
+```
+
+(`$G` = the windowed exe, `$GC` = the console exe.) `--fixed-fps` slows game time to the
+frame rate, so the bots must use a long `timeout`. Make contact sheets of every ~10th frame
+and look at them. Correct: the TV shows "ROUND n" and the prompt, then the camera turns to
+your CRT with the editor; during spotlights the TV fills the middle of the view with a
+"BOT MEME" meme, the HUD shows GOOD [1] / BAD [2] / SHOOT [Space], and shots appear as
+red "X shot Y!" toasts with a muzzle flash; at elimination the results panel lists scores
+(loser in red), the TV says "NAME IS OUT", a puff of smoke rises and that player slumps
+over their keyboard, washed out; at the end the win panel shows "<NAME> SURVIVED", the
+standings, and *Play again* / *Leave* on the host. A dead host shows "SPECTATING".
 
 ## Pitfalls (all hit in practice)
 
@@ -147,6 +181,6 @@ and look at the JPGs in `assets/meme_templates/`.
 ## Keep this skill current
 
 When a milestone adds scenes or launch flags (the 3D room in M3, the meme editor in M4,
-the round loop in M5), update the modes above with how to reach and verify the new screen.
+the round loop in M5, sound and hardening in M6), update the modes above with how to reach and verify the new screen.
 For example, add a flag that jumps straight into the meme editor and document what a
 correct screenshot looks like.

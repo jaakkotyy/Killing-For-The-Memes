@@ -100,8 +100,8 @@ Name: TBD (placeholder: "The Host").
   next phase short. Snapshots send `time_left`, not absolute times, so client clocks don't matter.
 - **Hidden information**: clients never receive other players' memes before their spotlight
   or other players' votes, so a modified client can't peek.
-- Clients should auto-submit their current draft just before creation ends (M5), so
-  forgetting to press "Done" doesn't count as no submission.
+- Clients auto-submit their current draft `auto_submit_lead` (1 s) before creation ends,
+  so forgetting to press "Done" doesn't count as no submission.
 
 ## Default timings (tunable)
 

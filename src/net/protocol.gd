@@ -10,11 +10,20 @@ extends RefCounted
 ##   client → server  _rpc_set_ready(is_ready: bool)
 ##   server → client  _rpc_lobby_snapshot(snapshot: Dictionary)   # LobbyState.to_dict()
 ##   server → client  _rpc_join_rejected(reason: String)           # followed by a kick
-##   server → client  _rpc_game_started(snapshot: Dictionary)
+##   server → client  _rpc_game_started(snapshot: Dictionary, config: Dictionary)
+##                    # LobbyState.to_dict(), GameConfig.to_dict()
+##   client → server  _rpc_submit_meme(meme: Dictionary)           # MemeSpec.to_dict()
+##   client → server  _rpc_cast_vote(value: int)                   # +1, -1, or 0 to take it back
+##   client → server  _rpc_shoot()
+##   server → client  _rpc_match_snapshot(snapshot: Dictionary)    # GameMatch.to_snapshot(now, you)
+##   server → client  _rpc_returned_to_lobby(snapshot: Dictionary) # LobbyState.to_dict()
+##
+## Match snapshots are sent whenever the match changes (phase, submission, vote, shot,
+## disconnect), at most once per frame. Clients count time_left down locally in between.
 ##
 ## The host has no RPC round trip to itself: Session calls ServerController directly.
 
-const VERSION: int = 1
+const VERSION: int = 2
 
 const DEFAULT_PORT: int = 7777
 const MAX_PLAYERS: int = 8
