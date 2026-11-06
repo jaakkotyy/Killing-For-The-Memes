@@ -41,6 +41,10 @@ changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are d
 Godot headless output can be very large; when running it from PowerShell, redirect to a
 file (`*> file.log`) and search the file instead of piping straight into `Select-String`.
 
+To run, drive or screenshot the actual game (headless scenarios, windowed instances, window
+captures), use the project skill `.claude/skills/run-game/`. Update it whenever a milestone
+adds new screens or launch flags.
+
 ## Architecture
 
 Layers, with dependencies pointing **downward only**:
