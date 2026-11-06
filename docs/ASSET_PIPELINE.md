@@ -8,7 +8,7 @@ that folder up separately. Only the exported, game-ready files are committed.
 ```powershell
 .\tools\build_models.ps1             # bake + rig + export (about 1 minute)
 .\tools\build_models.ps1 -SkipBake   # keep the committed normal/AO maps
-.\tools\build_models.ps1 -PropsOnly  # only the table props (a few seconds)
+.\tools\build_models.ps1 -PropsOnly  # skip the player: hat and table props (a few seconds)
 ```
 
 Requires Blender 2.81 or newer (`-Blender` or `$env:BLENDER`, default `D:\Blender\blender.exe`).
@@ -52,6 +52,25 @@ Poses are dictionaries of **world directions** per bone (Blender game space: −
 +Z up, +X = character's left); `sided()` mirrors `.L` entries to `.R`. Add a pose, add a
 `make_action()` call with keyframes, rebuild, and play it from `PlayerAvatar`.
 
+## Hat (`Hat - Accessory.blend` → `assets/models/player/hat.glb`)
+
+`build_player.py` measures a **hat band ring** on the rest-pose head: a horizontal slice 30 %
+of the way down from the top of the Head-weighted vertices (`HAT_BAND_DEPTH`), written to
+`player_metrics.json` as `hat_band` (centre, width, depth). `tools/blender/build_hat.py` then:
+
+1. Keeps the felt hat (`Sphere.004`) and its band (`Sphere.002`), applies the modifiers at
+   subdivision 1 and replaces the procedural materials with two flat colours (`HatFelt`,
+   `HatBand`, averaged from the source's colour ramps).
+2. Scales the hat so the band goes round the ring with 12 % room (`FIT`), puts the band's
+   bottom on the ring, lifts it 2 cm and tips it back 8° (`LIFT`, `TILT_BACK`) so players
+   looking down at their monitor still show their eyes.
+3. Decimates to 6k triangles and exports `hat.glb` **in the player's model space**.
+
+`PlayerAvatar` puts it on a `BoneAttachment3D` for the `Head` bone, undoing the bone's rest
+transform, so it sits exactly as fitted and follows every animation. For your own player in
+seat and TV views the hat only casts its shadow (`set_first_person`), or the brim would cover
+the top of the screen. Run the player build before the hat build (the script does).
+
 ## Table props (`cup.blend`, `can.blend`, `beer.blend` → `assets/models/props/`)
 
 `tools/blender/build_props.py --prop <name>` runs once per source file. Each file is a small
@@ -75,8 +94,6 @@ so every client sees the same table.
 
 - `Skull - DeathScene.blend` (1.5 M-triangle skull with a smoke simulation): needs
   decimating and baking; the smoke becomes Godot particles. Planned with the death scenes.
-- `Hat - Accessory.blend`: procedural materials need baking; planned as an optional
-  accessory on the `Head` bone.
 - `Human Eyes.blend`: its iris/sclera textures are missing from the asset folder.
 
 ## Pitfalls

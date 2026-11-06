@@ -114,7 +114,7 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   `Seat` per player with `SeatLayout` (an arc that leaves the TV side open for the host).
   A seat holds the chair, a drink (the artist's props from `assets/models/props/`, picked by
   `Seat.drink_index`), `PlayerAvatar` (the artist's model from `assets/models/player/`,
-  tinted per seat by vertex-colour clothing masks), keyboard, `CrtMonitor` and
+  tinted per seat by vertex-colour clothing masks, wearing the artist's hat on its Head bone), keyboard, `CrtMonitor` and
   `WristChain`s. `CameraRig` glides between seat, TV and overview poses with mouse drift.
   Chair, table and camera sizes come from `player_metrics.json` written by the Blender
   export, never from hand-tuned numbers. The room only reads Session state; M5 drives
@@ -195,3 +195,6 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   container-less SubViewport ignores the mouse until it gets `NOTIFICATION_VP_MOUSE_ENTER`.
 - Push test input to the root with `push_input(event, true)`: positions must already be in
   the stretched root-viewport space that `_input()` sees (the headless window is tiny).
+- Accessories (the hat) are fitted to the body in Blender and exported in the player's
+  rest-pose model space; Godot only attaches them to a bone. Refitting never needs
+  hand-tuned offsets in Godot. The local player's own hat is shadow-only in first person.

@@ -109,8 +109,9 @@ func _shot_spotlight_flinch() -> void:
 	_room.call("focus_spotlight", 3)
 	seat.avatar.hold_pose(PlayerAvatar.ANIM_FLINCH, 0.25)
 	seat.monitor.visible = false  # it would hide the player from this angle
-	var chest: Vector3 = seat.to_global(Vector3(0, 1.05, -0.05))
-	_look(seat.to_global(Vector3(0.15, 1.2, 1.35)), chest, 40.0)
+	# Aimed a little higher than the chest so the hat stays in frame.
+	var chest: Vector3 = seat.to_global(Vector3(0, 1.12, -0.05))
+	_look(seat.to_global(Vector3(0.15, 1.25, 1.45)), chest, 42.0)
 
 
 func _shot_staring_at_tv() -> void:
@@ -130,6 +131,7 @@ func _shot_empty_chair() -> void:
 
 func _shot_crt_static() -> void:
 	var seat: Seat = _seat(5)
+	seat.avatar.set_first_person(true)  # the camera is in this player's head, under the brim
 	_look(seat.to_global(Vector3(0.0, 1.38, -0.12)), seat.to_global(Vector3(0, 0.85, 0.9)), 52.0)
 
 
