@@ -1,8 +1,10 @@
+class_name GameRoom
 extends Node3D
-## The 3D room (M3 greybox): a round table with one seat per player, the wall TV, the host,
-## a flickering lamp and a spotlight. Reads players from the Session mirror and never
-## changes game state itself; M5 drives the spotlight, flinches and deaths from snapshots.
-## The local player's MemeStation puts the meme editor on their CRT (M4).
+## The 3D room: a round table with one seat per player, the wall TV, the host, a flickering
+## lamp and a spotlight. Reads players from the Session mirror and never changes game state
+## itself. In a real game a MatchPresenter drives it from match snapshots (TV, spotlight,
+## camera, shots, deaths) and a MatchHud shows timers, voting and the win screen.
+## The local player's MemeStation puts the meme editor on their CRT.
 ##
 ## `--room-preview=<n>` opens this scene directly with n fake players (no network).
 
@@ -10,6 +12,7 @@ enum View { SEAT, TV, OVERVIEW }
 
 const HOST_SCENE: PackedScene = preload("res://src/world/host/the_host.tscn")
 const TV_SCENE: PackedScene = preload("res://src/world/wall_tv/wall_tv.tscn")
+const HUD_SCENE: PackedScene = preload("res://src/ui/hud/match_hud.tscn")
 
 const ROOM_HALF_SIZE: float = 5.0
 const CEILING_HEIGHT: float = 3.4
@@ -19,6 +22,8 @@ const TV_POSITION: Vector3 = Vector3(0.0, 2.05, -ROOM_HALF_SIZE + 0.42)
 const OVERVIEW_EYE: Vector3 = Vector3(2.7, 2.9, 3.9)
 const OVERVIEW_TARGET: Vector3 = Vector3(-0.2, 0.8, -0.9)
 const CAMERA_GLIDE_SECONDS: float = 0.9
+## Narrow enough that a meme on the wall TV is readable from any seat.
+const TV_VIEW_FOV: float = 32.0
 const DEMO_STEP_SECONDS: float = 3.0
 
 var _seats: Dictionary = {}  # player id -> Seat
@@ -30,6 +35,11 @@ var _lamp_time: float = 0.0
 var _tv: WallTv
 var _host: TheHost
 var _station: MemeStation
+var _presenter: MatchPresenter
+var _match_hud: MatchHud
+## Whether the local player may open the meme editor now (the presenter allows it during
+## creation only; the preview always does).
+var _editing_allowed: bool = true
 ## Set false before adding the room to stop the preview's spotlight demo (staged shots).
 var demo_enabled: bool = true
 ## Fake players for a preview room; -1 means use the --room-preview launch flag.
@@ -63,15 +73,22 @@ func _ready() -> void:
 	if _is_preview():
 		if demo_enabled:
 			_start_demo()
+		_set_view(_initial_view(), 0.0)
 	else:
 		Session.lobby_updated.connect(_on_lobby_updated)
-	_set_view(_initial_view(), 0.0)
+		_set_view(_initial_view(), 0.0)
+		_match_hud = HUD_SCENE.instantiate()
+		add_child(_match_hud)
+		_presenter = MatchPresenter.new()
+		add_child(_presenter)
+		_presenter.setup(self)
 	if _station != null and App.options != null and App.options.room_camera == "editor":
 		_station.open(true)
 
 
-## The local player's editor and CRT zoom. Until the round loop (M5) the prompt and the
-## countdown are local placeholders, and submitting only shows the meme on the wall TV.
+## The local player's editor and CRT zoom. In a real game the presenter sets the prompt
+## and the countdown and sends submissions to the server; the preview uses a local prompt
+## and only shows a submitted meme on the wall TV.
 func _build_station() -> void:
 	var seat: Seat = _seats.get(_local_id) as Seat
 	if seat == null:
@@ -79,15 +96,17 @@ func _build_station() -> void:
 	_station = MemeStation.new()
 	add_child(_station)
 	_station.setup(_camera, seat)
+	_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
+	if not _is_preview():
+		return
 	var file := FileAccess.open("res://data/prompts/default.json", FileAccess.READ)
 	var deck: PromptDeck = PromptDeck.from_json(file.get_as_text() if file != null else "")
-	_station.editor.set_prompt(deck.draw() if deck.size() > 0 else tr("Make a meme!"))
+	_station.editor.set_prompt(deck.draw() if deck != null else tr("Make a meme!"))
 	_station.editor.set_time_left(GameConfig.new().create_duration)
-	_station.meme_submitted.connect(_on_meme_submitted)
-	_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
+	_station.meme_submitted.connect(_on_preview_meme_submitted)
 
 
-func _on_meme_submitted(spec: MemeSpec) -> void:
+func _on_preview_meme_submitted(spec: MemeSpec) -> void:
 	print("[Room] Meme submitted: %s" % spec.to_dict())
 	_tv.show_meme(spec)
 
@@ -127,6 +146,39 @@ func get_seat(player_id: int) -> Seat:
 	return _seats.get(player_id) as Seat
 
 
+func get_local_id() -> int:
+	return _local_id
+
+
+## The local player's meme station, or null when they have no seat.
+func get_station() -> MemeStation:
+	return _station
+
+
+func get_match_hud() -> MatchHud:
+	return _match_hud
+
+
+## Glides the camera to a view (the presenter's choreography; Tab still overrides it).
+func set_view(view: View) -> void:
+	if view != _view:
+		_set_view(view, CAMERA_GLIDE_SECONDS)
+
+
+func get_view() -> View:
+	return _view
+
+
+## Allows or forbids opening the meme editor; forbidding closes it if it is open.
+func set_editing_allowed(allowed: bool) -> void:
+	_editing_allowed = allowed
+	if _station != null:
+		_station.enabled = allowed and _view == View.SEAT
+		if not allowed and _station.is_open():
+			_station.close()
+	_update_hint()
+
+
 func get_host() -> TheHost:
 	return _host
 
@@ -149,11 +201,17 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _station != null and _station.is_open():
 		return
-	if not OS.is_debug_build() or not event is InputEventKey or not event.is_pressed() or event.is_echo():
+	if not event is InputEventKey or not event.is_pressed() or event.is_echo():
 		return
-	match (event as InputEventKey).keycode:
-		KEY_TAB:
-			_set_view(((_view + 1) % View.size()) as View, CAMERA_GLIDE_SECONDS)
+	var key: Key = (event as InputEventKey).keycode
+	if key == KEY_TAB:
+		_set_view(((_view + 1) % View.size()) as View, CAMERA_GLIDE_SECONDS)
+		get_viewport().set_input_as_handled()
+		return
+	# The demo keys would fight the presenter in a real game.
+	if not OS.is_debug_build() or not _is_preview():
+		return
+	match key:
 		KEY_F:
 			var ids: Array = _seats.keys()
 			if not ids.is_empty():
@@ -176,13 +234,13 @@ func _set_view(view: View, duration: float) -> void:
 	if seat != null:
 		seat.avatar.set_first_person(view != View.OVERVIEW)
 	if _station != null:
-		_station.enabled = view == View.SEAT
+		_station.enabled = _editing_allowed and view == View.SEAT
 	_update_hint()
 	match view:
 		View.SEAT:
 			_camera.move_to(seat.get_eye_pose(), 62.0, duration, true)
 		View.TV:
-			_camera.move_to(CameraRig.pose_looking_at(seat.get_eye_position(), TV_POSITION), 45.0, duration, true)
+			_camera.move_to(CameraRig.pose_looking_at(seat.get_eye_position(), TV_POSITION), TV_VIEW_FOV, duration, true)
 		View.OVERVIEW:
 			_camera.move_to(CameraRig.pose_looking_at(OVERVIEW_EYE, OVERVIEW_TARGET), 62.0, duration, false)
 
@@ -192,10 +250,11 @@ func _update_hint() -> void:
 	if _station != null and _station.is_open():
 		parts.append(tr("Esc: look up"))
 	else:
-		if _station != null and _view == View.SEAT:
+		if _station != null and _editing_allowed and _view == View.SEAT:
 			parts.append(tr("E or click your monitor: make a meme"))
-		if OS.is_debug_build():
-			parts.append(tr("Dev keys: Tab camera · F flinch · G spotlight"))
+		parts.append(tr("Tab: camera"))
+		if OS.is_debug_build() and _is_preview():
+			parts.append(tr("Dev keys: F flinch · G spotlight"))
 	_hint_label.text = "   ·   ".join(parts)
 
 
