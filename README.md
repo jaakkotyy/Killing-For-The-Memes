@@ -36,6 +36,19 @@ game falls back to the list saved last time, and then to our own templates only.
 off with `--offline-templates` (or `online_templates=false` in `settings.cfg`). Those
 images belong to their owners; see [CREDITS.md](CREDITS.md).
 
+**GIF templates** come from [GIPHY](https://developers.giphy.com) and need the host's
+own API key (free; a new key allows 100 requests an hour, and the game makes one per
+hosted lobby). Create one in the GIPHY developer dashboard, then either set it for your
+user account:
+
+```powershell
+[Environment]::SetEnvironmentVariable("GIPHY_API_KEY", "<your key>", "User")
+```
+
+or put `giphy_api_key="<your key>"` under `[general]` in `settings.cfg`. Never commit it.
+Restart the game; the host log then says `[Templates] 25 GIF templates from GIPHY.` GIF
+templates are listed as "GIF: ..." and play in the preview and on the wall TV.
+
 ## Requirements
 
 - [Godot 4.7.2 (standard, not .NET)](https://godotengine.org/download/archive/4.7.2-stable/)

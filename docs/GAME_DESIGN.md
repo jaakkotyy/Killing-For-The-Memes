@@ -48,9 +48,10 @@ Name: TBD (placeholder: "The Host").
 
 - From your seat press **E** or click your monitor: the camera glides in until the CRT
   fills the screen and the editor takes over (still curved and scanlined). **Esc** looks up.
-- Pick one of the templates: popular memes from Imgflip first (fetched by the host, see
-  CREDITS.md), then our original shots of this room (the host, players in the spotlight,
-  the empty chair...). Type a top and a bottom caption, press **Done**.
+- Pick one of the templates: popular memes from Imgflip first, then reaction GIFs from
+  GIPHY (both fetched by the host, see CREDITS.md; GIFs need the host's GIPHY key), then
+  our original shots of this room (the host, players in the spotlight, the empty chair...).
+  Type a top and a bottom caption, press **Done**. GIF memes play on the wall TV.
   Captions are uppercase with a black outline and shrink to fit. You can resubmit until
   time runs out; the draft is submitted automatically at zero.
 
@@ -128,8 +129,8 @@ Name: TBD (placeholder: "The Host").
   meme, bet on who dies to earn bullets, lockpicking minigame for a one-time escape, throwing
   physics objects at the spotlight player.
 - **HP mode**: damage instead of instant death.
-- **GIF templates** via a GIF API (GIPHY: needs a key, "Powered by GIPHY" attribution and
-  our own GIF decoder; Tenor's API shut down on 2026-06-30).
+- **GIF search** in the editor (players search GIPHY themselves instead of one host-picked
+  list), and the official "Powered by GIPHY" mark for a production key.
 - **Caption boxes per template** (e.g. Drake's two panels) instead of top/bottom only.
 - **Custom prompt packs** (JSON in `data/prompts/`, later user-loadable / Workshop).
 - **Steam**: lobbies, friend invites, P2P relay networking, achievements, rich presence.

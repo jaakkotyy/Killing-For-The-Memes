@@ -39,7 +39,10 @@ With `-FullGame` every instance is an `--auto-play` bot on `--fast-rounds` timer
 print `SMOKE_TEST PASS: game over after N rounds, winner <name>` (N = players - 1). Also
 search the logs for `SCRIPT ERROR`: the room, presenter and HUD run headless on every peer.
 Smoke tests pass `--offline-templates` unless `-Online` is given; then the host must log
-`[Templates] 40 popular templates from Imgflip.` and bots submit `imgflip-<n>` ids.
+`[Templates] 40 popular templates from Imgflip.` and bots submit `imgflip-<n>` ids. With a
+`GIPHY_API_KEY` in the environment it also logs `[Templates] 25 GIF templates from GIPHY.`
+and bots may submit `giphy-<id>` ids; `GIPHY unreachable (or the key was refused)` means
+a bad key. Check a key's presence with `[ -n "$GIPHY_API_KEY" ]`, never print it.
 
 ### 2. Custom headless scenario
 
