@@ -64,8 +64,9 @@ func test_host_cannot_point_clients_elsewhere() -> void:
 
 
 func test_search_url_encodes_the_query_and_caps_the_limit() -> void:
-	var url: String = GiphyCatalogue.search_url("KEY", "so tired", 500)
-	assert_true(url.begins_with(GiphyCatalogue.SEARCH_URL + "?api_key=KEY&q=so%20tired&limit=50&rating=pg-13"))
+	var url: String = GiphyCatalogue.search_url("KEY", "so tired", 500, 99999)
+	assert_eq(url, GiphyCatalogue.SEARCH_URL + "?api_key=KEY&q=so%%20tired&limit=50&offset=%d&rating=%s&lang=en"
+		% [GiphyCatalogue.MAX_OFFSET, GiphyCatalogue.RATING])
 
 
 # --- Combined catalogue -------------------------------------------------------------------

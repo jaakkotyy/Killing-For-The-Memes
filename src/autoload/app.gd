@@ -24,6 +24,8 @@ var _smoke_game_started: bool = false
 var _smoke_game_over: String = ""
 var _smoke_finished: bool = false
 var _template_source: OnlineTemplateSource
+## Host: answers every player's template searches.
+var _template_search: TemplateSearch
 ## The host's popular templates, once fetched (kept for later games in this run).
 var _online_entries: Array[Dictionary] = []
 
@@ -34,6 +36,10 @@ func _ready() -> void:
 		Session.min_players = options.min_players
 	Session.auto_start = options.auto_start
 	Session.allowed_templates = MemeTemplateLibrary.get_default().ids()
+	if _online_templates_wanted():
+		# Any online template may be used, even one only a search found.
+		Session.template_accepts = MemeTemplateLibrary.get_default().accepts
+	Session.template_search_requested.connect(_on_template_search_requested)
 	if options.fast_rounds and OS.is_debug_build():
 		Session.host_config = fast_config()
 	if options.seed_value != 0:
@@ -113,6 +119,20 @@ func _offer_online_templates() -> void:
 	# An auto-started test game waits for the catalogue (the fetch gives up after a few seconds).
 	Session.auto_start = false
 	_template_source.fetch()
+
+
+## Host: searches for a player. With online templates off, the answer is always nothing.
+func _on_template_search_requested(peer_id: int, query: String) -> void:
+	if not _online_templates_wanted():
+		Session.send_template_search_results(peer_id, TemplateSearch.clean_query(query), [] as Array[Dictionary])
+		return
+	if _template_search == null:
+		_template_search = TemplateSearch.new()
+		_template_search.name = "TemplateSearch"
+		_template_search.giphy_api_key = Settings.get_giphy_api_key()
+		add_child(_template_search)
+		_template_search.finished.connect(Session.send_template_search_results)
+	_template_search.request(peer_id, query)
 
 
 func _on_templates_fetched(entries: Array[Dictionary]) -> void:

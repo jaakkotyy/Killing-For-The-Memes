@@ -33,6 +33,9 @@ var _deck: PromptDeck
 var _rng: RandomNumberGenerator
 ## Template ids accepted by submit_meme(); empty accepts any well-formed id.
 var _allowed_templates: PackedStringArray = []
+## When set, decides instead which template ids submit_meme() accepts (id -> bool). The
+## server sets it so memes may use any online template, even one just found by a search.
+var template_accepts: Callable
 
 # --- Current round ---
 var _submissions: Dictionary[int, MemeSpec] = {}
@@ -82,8 +85,9 @@ func submit_meme(player_id: int, data: Variant, now: float) -> IntentResult:
 		return IntentResult.WRONG_PHASE
 	if not _is_alive(player_id):
 		return IntentResult.NOT_ALLOWED
-	var spec: MemeSpec = MemeSpec.from_untrusted(data, _allowed_templates)
-	if spec == null:
+	var custom: bool = template_accepts.is_valid()
+	var spec: MemeSpec = MemeSpec.from_untrusted(data, PackedStringArray() if custom else _allowed_templates)
+	if spec == null or (custom and not bool(template_accepts.call(spec.template_id))):
 		return IntentResult.INVALID
 	_submissions[player_id] = spec
 	if _everyone_submitted():

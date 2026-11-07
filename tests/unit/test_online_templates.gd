@@ -32,7 +32,11 @@ func _library() -> MemeTemplateLibrary:
 func test_parses_an_api_answer_in_popularity_order() -> void:
 	var entries: Array[Dictionary] = ImgflipCatalogue.parse_response(RESPONSE)
 	assert_eq(entries.size(), 3)
-	assert_eq(entries[0]["id"], "imgflip-181913649")
+	assert_eq(entries[0]["id"], "imgflip-30b1gx", "the id names the image file")
+	assert_eq(entries[0]["url"], "https://i.imgflip.com/30b1gx.jpg")
+	assert_eq(entries[0]["thumb_url"], "https://i.imgflip.com/4/30b1gx.jpg")
+	assert_eq(entries[2]["id"], "imgflip-1ur9b0-png")
+	assert_eq(entries[2]["url"], "https://i.imgflip.com/1ur9b0.png")
 	assert_eq(entries[0]["name"], "Drake Hotline Bling")
 	assert_eq(entries[1]["width"], 600)
 	assert_eq(entries[1]["height"], 908)
@@ -52,40 +56,50 @@ func test_unsuccessful_or_broken_answers_give_nothing() -> void:
 	assert_eq(ImgflipCatalogue.parse_response("").size(), 0)
 
 
-func test_only_imgflip_image_urls_are_accepted() -> void:
-	assert_true(ImgflipCatalogue.is_valid_url("https://i.imgflip.com/30b1gx.jpg"))
-	assert_true(ImgflipCatalogue.is_valid_url("https://i.imgflip.com/1ur9b0.png"))
+func test_api_entries_off_imgflip_are_skipped() -> void:
 	for bad: String in [
 		"http://i.imgflip.com/30b1gx.jpg",  # not https
 		"https://evil.example/30b1gx.jpg",
 		"https://i.imgflip.com.evil.example/30b1gx.jpg",
 		"https://i.imgflip.com/../secret.jpg",
 		"https://i.imgflip.com/a/b.jpg",
-		"https://i.imgflip.com/30b1gx.gif",  # GIFs come later
+		"https://i.imgflip.com/30b1gx.gif",
 		"https://i.imgflip.com/30b1gx.jpg?x=1",
 		"file:///C:/Windows/win.ini",
 	]:
-		assert_false(ImgflipCatalogue.is_valid_url(bad), bad)
+		var answer: String = JSON.stringify({"success": true, "data": {"memes": [
+			{"id": "1", "name": "x", "url": bad, "width": 400, "height": 300}]}})
+		assert_eq(ImgflipCatalogue.parse_response(answer).size(), 0, bad)
+
+
+func test_urls_are_rebuilt_from_the_id() -> void:
+	var clean: Dictionary = ImgflipCatalogue.sanitize_entry({"id": "imgflip-30b1gx", "name": "x", "width": 400,
+		"height": 300, "url": "https://evil.example/steal.jpg", "thumb_url": "file:///C:/secret"})
+	assert_eq(clean["url"], "https://i.imgflip.com/30b1gx.jpg")
+	assert_eq(clean["thumb_url"], "https://i.imgflip.com/4/30b1gx.jpg")
+	assert_eq(ImgflipCatalogue.resolve("imgflip-1ur9b0-png")["url"], "https://i.imgflip.com/1ur9b0.png")
+	for bad: String in ["imgflip-", "imgflip-a.b", "imgflip-../x", "imgflip-abcdefghijklmnopq", "giphy-abc", "crt_static"]:
+		assert_eq(ImgflipCatalogue.resolve(bad), {}, bad)
 
 
 func test_sanitize_drops_bad_entries_from_a_host() -> void:
 	var entries: Array[Dictionary] = ImgflipCatalogue.sanitize([
-		_entry("imgflip-1", "https://i.imgflip.com/aaa.jpg"),
-		_entry("imgflip-1", "https://i.imgflip.com/bbb.jpg"),  # duplicate id
-		_entry("crt_static", "https://i.imgflip.com/ccc.jpg"),  # not an online id
-		_entry("imgflip-abc", "https://i.imgflip.com/ddd.jpg"),  # not a numeric Imgflip id
-		_entry("imgflip-2", "https://evil.example/eee.jpg"),
-		_entry("imgflip-3", "https://i.imgflip.com/fff.jpg", 99999, 300),
-		_entry("imgflip-4", "https://i.imgflip.com/ggg.jpg", "400", 300),
-		_entry("imgflip-5", "https://i.imgflip.com/hhh.jpg", 400, 300, {"evil": true}),
+		_entry("imgflip-aaa", ""),
+		_entry("imgflip-aaa", ""),  # duplicate id
+		_entry("crt_static", ""),  # not an online id
+		_entry("imgflip-a.b", ""),  # not an image file name
+		_entry("imgflip-fff", "", 99999, 300),
+		_entry("imgflip-ggg", "", "400", 300),
+		_entry("imgflip-hhh", "", 400, 300, {"evil": true}),
 		"not a dictionary",
-		_entry("imgflip-6", "https://i.imgflip.com/iii.jpg", 400.0, 300, "Line\nbreak  name"),
+		_entry("imgflip-iii", "", 400.0, 300, "Line
+break  name"),
 	])
 	var ids: Array[String] = []
 	for entry: Dictionary in entries:
 		ids.append(entry["id"])
-	assert_eq(ids, ["imgflip-1", "imgflip-5", "imgflip-6"] as Array[String])
-	assert_eq(entries[1]["name"], "imgflip-5", "a non-string name falls back to the id")
+	assert_eq(ids, ["imgflip-aaa", "imgflip-hhh", "imgflip-iii"] as Array[String])
+	assert_eq(entries[1]["name"], "imgflip-hhh", "a non-string name falls back to the id")
 	assert_eq(entries[2]["name"], "Line break name")
 	assert_eq(ImgflipCatalogue.sanitize("nope").size(), 0)
 
@@ -93,7 +107,7 @@ func test_sanitize_drops_bad_entries_from_a_host() -> void:
 func test_sanitize_caps_the_count() -> void:
 	var many: Array = []
 	for i: int in range(ImgflipCatalogue.MAX_ENTRIES + 20):
-		many.append(_entry("imgflip-%d" % i, "https://i.imgflip.com/x%d.jpg" % i))
+		many.append(_entry("imgflip-x%d" % i, ""))
 	assert_eq(ImgflipCatalogue.sanitize(many, 1000).size(), ImgflipCatalogue.MAX_ENTRIES)
 
 
@@ -103,18 +117,19 @@ func test_online_templates_come_first_and_can_be_replaced() -> void:
 	var library: MemeTemplateLibrary = _library()
 	assert_false(library.has_online())
 	library.set_online(ImgflipCatalogue.parse_response(RESPONSE, 2))
-	assert_eq(library.ids(), PackedStringArray(["imgflip-181913649", "imgflip-87743020", "crt_static", "empty_chair"]))
+	assert_eq(library.ids(), PackedStringArray(["imgflip-30b1gx", "imgflip-1g8my4", "crt_static", "empty_chair"]))
 	assert_eq(library.original_ids(), PackedStringArray(["crt_static", "empty_chair"]))
-	assert_true(library.is_online("imgflip-87743020"))
+	assert_true(library.is_online("imgflip-1g8my4"))
 	assert_false(library.is_online("crt_static"))
-	assert_eq(library.display_name("imgflip-87743020"), "Two Buttons")
-	assert_almost_eq(library.aspect("imgflip-87743020"), 600.0 / 908.0, 0.0001)
+	assert_eq(library.display_name("imgflip-1g8my4"), "Two Buttons")
+	assert_almost_eq(library.aspect("imgflip-1g8my4"), 600.0 / 908.0, 0.0001)
 	assert_almost_eq(library.aspect("crt_static"), 4.0 / 3.0, 0.0001)
 	assert_eq(library.online_entries().size(), 2)
 	library.set_online([] as Array[Dictionary])
 	assert_eq(library.ids(), PackedStringArray(["crt_static", "empty_chair"]))
-	assert_false(library.has("imgflip-181913649"))
-	assert_eq(library.display_name("imgflip-181913649"), "imgflip-181913649")
+	assert_false(library.has("imgflip-30b1gx"))
+	assert_true(library.accepts("imgflip-30b1gx"), "an id alone still names its image")
+	assert_eq(library.display_name("imgflip-30b1gx"), "imgflip-30b1gx")
 
 
 func test_the_json_file_cannot_claim_online_ids() -> void:
@@ -125,16 +140,29 @@ func test_the_json_file_cannot_claim_online_ids() -> void:
 func test_server_accepts_online_ids_it_was_given() -> void:
 	var library: MemeTemplateLibrary = _library()
 	library.set_online(ImgflipCatalogue.parse_response(RESPONSE))
-	var spec: MemeSpec = MemeSpec.from_untrusted({"template_id": "imgflip-112126428", "top_text": "me"}, library.ids())
+	var spec: MemeSpec = MemeSpec.from_untrusted({"template_id": "imgflip-1ur9b0-png", "top_text": "me"}, library.ids())
 	assert_not_null(spec)
 	assert_null(MemeSpec.from_untrusted({"template_id": "imgflip-999"}, library.ids()))
 
 
+func test_any_valid_online_id_is_accepted_and_drawable() -> void:
+	var library: MemeTemplateLibrary = _library()
+	assert_true(library.accepts("crt_static"))
+	assert_true(library.accepts("imgflip-zzz9"))
+	assert_true(library.accepts("giphy-Abc1"))
+	assert_true(library.accepts("reddit-abc123-png"))
+	assert_true(library.is_online("imgflip-zzz9"))
+	assert_true(library.is_animated("giphy-Abc1"))
+	assert_false(library.accepts("imgflip-a.b"))
+	assert_false(library.accepts("not_ours"))
+	assert_false(library.has("imgflip-zzz9"), "resolving doesn't add it to the catalogue")
+
+
 func test_missing_image_offline_is_reported_as_failed() -> void:
 	var library: MemeTemplateLibrary = _library()
-	library.set_online([_entry("imgflip-77", "https://i.imgflip.com/nothere1.jpg")] as Array[Dictionary])
-	assert_null(library.texture("imgflip-77"))
-	assert_true(library.image_failed("imgflip-77"))
+	library.set_online([_entry("imgflip-nothere1", "https://i.imgflip.com/nothere1.jpg")] as Array[Dictionary])
+	assert_null(library.texture("imgflip-nothere1"))
+	assert_true(library.image_failed("imgflip-nothere1"))
 	assert_false(library.image_failed("crt_static"))
 
 
@@ -146,15 +174,15 @@ func test_cached_image_loads_without_the_network() -> void:
 	file.store_buffer(image.save_png_to_buffer())
 	file.close()
 	var library: MemeTemplateLibrary = _library()
-	library.set_online([_entry("imgflip-78", TEST_URL, 40, 30)] as Array[Dictionary])
+	library.set_online([_entry("imgflip-guttest1", TEST_URL, 40, 30)] as Array[Dictionary])
 	watch_signals(library)
-	assert_null(library.texture("imgflip-78"), "decoding happens off the main thread")
+	assert_null(library.texture("imgflip-guttest1"), "decoding happens off the main thread")
 	await wait_for_signal(library.image_updated, 5.0)
-	assert_signal_emitted_with_parameters(library, "image_updated", ["imgflip-78"])
-	var texture: Texture2D = library.texture("imgflip-78")
+	assert_signal_emitted_with_parameters(library, "image_updated", ["imgflip-guttest1"])
+	var texture: Texture2D = library.texture("imgflip-guttest1")
 	assert_not_null(texture)
 	assert_eq(texture.get_size(), Vector2(40, 30))
-	assert_false(library.image_failed("imgflip-78"))
+	assert_false(library.image_failed("imgflip-guttest1"))
 
 
 # --- Images and layout --------------------------------------------------------------------
@@ -198,7 +226,7 @@ func test_renderer_puts_captions_on_the_image() -> void:
 	renderer.library = library
 	renderer.size = Vector2(400, 300)
 	add_child_autofree(renderer)
-	renderer.set_meme(MemeSpec.new("imgflip-87743020", "top", "bottom"))
+	renderer.set_meme(MemeSpec.new("imgflip-1g8my4", "top", "bottom"))
 	var rect: Rect2 = renderer.image_rect()
 	assert_almost_eq(rect.size.y, 300.0, 0.01)
 	assert_almost_eq(rect.size.x, 300.0 * 600.0 / 908.0, 0.01)

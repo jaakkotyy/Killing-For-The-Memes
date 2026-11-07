@@ -136,6 +136,18 @@ func test_allowed_templates_are_enforced() -> void:
 	assert_eq(restricted.submit_meme(1, {"template_id": "office_fire"}, 6.0), GameMatch.IntentResult.OK)
 
 
+func test_template_accepts_overrides_the_allowed_list() -> void:
+	var players: Array[LobbyPlayer] = [LobbyPlayer.new(1, "A", 0), LobbyPlayer.new(2, "B", 1)]
+	var rng := RandomNumberGenerator.new()
+	var custom := GameMatch.new(GameConfig.new(), players, PromptDeck.new(PackedStringArray(["p"]), rng), rng, PackedStringArray(["office_fire"]))
+	custom.template_accepts = func(id: String) -> bool: return id.begins_with("imgflip-")
+	custom.start(0.0)
+	custom.update(custom.phase_ends_at)
+	assert_eq(custom.submit_meme(1, {"template_id": "imgflip-found1"}, 6.0), GameMatch.IntentResult.OK)
+	assert_eq(custom.submit_meme(1, {"template_id": "office_fire"}, 6.0), GameMatch.IntentResult.INVALID)
+	assert_eq(custom.submit_meme(1, {"template_id": "imgflip-bad id"}, 6.0), GameMatch.IntentResult.INVALID)
+
+
 # --- Voting and shooting ------------------------------------------------------------------
 
 func test_vote_rules() -> void:

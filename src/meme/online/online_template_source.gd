@@ -1,52 +1,77 @@
 class_name OnlineTemplateSource
 extends Node
-## Fetches the online template catalogue on the host: popular stills from Imgflip, then
-## reaction GIFs from GIPHY when there is an API key. Whatever arrives is saved; if
-## nothing can be reached, the catalogue saved last time is used, and then nothing (our
-## original templates still work).
+## Fetches the online template catalogue on the host, from every provider at once:
+## Imgflip's popular list plus two random pages of its deeper catalogue, fresh memes from
+## a few subreddits, and (with a GIPHY key) GIFs for a couple of random moods. The mix is
+## shuffled, so every game offers something different. Whatever arrives is saved; a
+## provider that can't be reached falls back to its part of the catalogue saved last time
+## (our original templates always work).
 ##
-## A provider is just a URL plus a parser that returns validated entries, so swapping one
-## for a licensed source only touches this class and that provider's catalogue class.
+## A provider is a URL plus a parser that returns validated entries; adding one only
+## touches this class and that provider's catalogue class.
 
 signal fetched(entries: Array[Dictionary])
 
-## How many popular stills to offer. Every client downloads these images once.
-const DEFAULT_LIMIT: int = 40
-const DEFAULT_GIF_LIMIT: int = 25
-const TIMEOUT_SECONDS: float = 8.0
-const CATALOGUE_CACHE: String = TemplateImageCache.CACHE_DIR + "catalogue.json"
+## Imgflip's template pages go this deep (40 templates a page) while still being memes
+## people recognise.
+const IMGFLIP_PAGES: Vector2i = Vector2i(2, 30)
+const IMGFLIP_EXTRA_PAGES: int = 2
+const REDDIT_PER_SUBREDDIT: int = 20
+const GIPHY_QUERIES: int = 2
+const GIPHY_PER_QUERY: int = 15
+## Not past the first few hundred results: deeper ones are rarely good reactions.
+const GIPHY_MAX_OFFSET: int = 200
+## Version 2: ids name image files (catalogues saved before that are ignored).
+const CATALOGUE_CACHE: String = TemplateImageCache.CACHE_DIR + "catalogue_v2.json"
 
-var limit: int = DEFAULT_LIMIT
-var gif_limit: int = DEFAULT_GIF_LIMIT
 ## The host's GIPHY key; empty means no GIFs. Never logged.
 var giphy_api_key: String = ""
-var gif_query: String = GiphyCatalogue.DEFAULT_QUERY
+var subreddits: PackedStringArray = RedditCatalogue.DEFAULT_SUBREDDITS
+## Tests seed this for a repeatable mix.
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 var _busy: bool = false
+
+
+func _init() -> void:
+	rng.randomize()
 
 
 func fetch() -> void:
 	if _busy:
 		return
 	_busy = true
+	var urls: PackedStringArray = [ImgflipCatalogue.API_URL]
+	for page: int in _distinct(IMGFLIP_EXTRA_PAGES, IMGFLIP_PAGES.x, IMGFLIP_PAGES.y):
+		urls.append(ImgflipCatalogue.templates_url(page))
+	var reddit_from: int = urls.size()
+	for subreddit: String in subreddits:
+		urls.append(RedditCatalogue.api_url(subreddit, REDDIT_PER_SUBREDDIT))
+	var giphy_from: int = urls.size()
+	if not giphy_api_key.is_empty():
+		for index: int in _distinct(GIPHY_QUERIES, 0, GiphyCatalogue.CATALOGUE_QUERIES.size() - 1):
+			urls.append(GiphyCatalogue.search_url(giphy_api_key, GiphyCatalogue.CATALOGUE_QUERIES[index],
+				GIPHY_PER_QUERY, rng.randi_range(0, GIPHY_MAX_OFFSET)))
+	var bodies: PackedStringArray = await HttpText.fetch_all(self, urls)
+
+	var stills: Array[Dictionary] = ImgflipCatalogue.parse_response(bodies[0])
+	for i: int in range(1, reddit_from):
+		stills.append_array(ImgflipCatalogue.parse_html(bodies[i]))
+	var reddit: Array[Dictionary] = []
+	for i: int in range(reddit_from, giphy_from):
+		reddit.append_array(RedditCatalogue.parse_response(bodies[i]))
+	var gifs: Array[Dictionary] = []
+	for i: int in range(giphy_from, urls.size()):
+		gifs.append_array(GiphyCatalogue.parse_response(bodies[i]))
+
 	var saved: Array[Dictionary] = load_cached()
 	var entries: Array[Dictionary] = []
-	var stills: Array[Dictionary] = ImgflipCatalogue.parse_response(await _fetch_text(ImgflipCatalogue.API_URL), limit)
-	if stills.is_empty():
-		stills = _from_provider(saved, ImgflipCatalogue.ID_PREFIX)
-		print("[Templates] Imgflip unreachable; %d saved popular templates." % stills.size())
-	else:
-		print("[Templates] %d popular templates from Imgflip." % stills.size())
-	entries.append_array(stills)
+	entries.append_array(_or_saved(stills, saved, ImgflipCatalogue.ID_PREFIX, "Imgflip"))
+	entries.append_array(_or_saved(reddit, saved, RedditCatalogue.ID_PREFIX, "Reddit"))
 	if not giphy_api_key.is_empty():
-		var gifs: Array[Dictionary] = GiphyCatalogue.parse_response(
-			await _fetch_text(GiphyCatalogue.search_url(giphy_api_key, gif_query, gif_limit)), gif_limit)
-		if gifs.is_empty():
-			gifs = _from_provider(saved, GiphyCatalogue.ID_PREFIX)
-			print("[Templates] GIPHY unreachable (or the key was refused); %d saved GIF templates." % gifs.size())
-		else:
-			print("[Templates] %d GIF templates from GIPHY." % gifs.size())
-		entries.append_array(gifs)
+		entries.append_array(_or_saved(gifs, saved, GiphyCatalogue.ID_PREFIX, "GIPHY"))
+	entries = TemplateCatalogue.sanitize(entries)  # drops duplicates across pages
+	_shuffle(entries)
 	if not entries.is_empty():
 		_save(entries)
 	_busy = false
@@ -63,27 +88,33 @@ static func load_cached() -> Array[Dictionary]:
 	return TemplateCatalogue.sanitize(json.data)
 
 
-static func _from_provider(entries: Array[Dictionary], prefix: String) -> Array[Dictionary]:
+func _or_saved(fresh: Array[Dictionary], saved: Array[Dictionary], prefix: String, provider: String) -> Array[Dictionary]:
+	if not fresh.is_empty():
+		print("[Templates] %d templates from %s." % [fresh.size(), provider])
+		return fresh
 	var result: Array[Dictionary] = []
-	for entry: Dictionary in entries:
+	for entry: Dictionary in saved:
 		if (entry["id"] as String).begins_with(prefix):
 			result.append(entry)
+	print("[Templates] %s unreachable; %d saved templates." % [provider, result.size()])
 	return result
 
 
-## The body of a GET, or "" on any failure.
-func _fetch_text(url: String) -> String:
-	var request := HTTPRequest.new()
-	request.timeout = TIMEOUT_SECONDS
-	request.body_size_limit = 2 * 1024 * 1024
-	add_child(request)
-	if request.request(url) != OK:
-		request.queue_free()
-		return ""
-	var answer: Array = await request.request_completed
-	request.queue_free()
-	var ok: bool = answer[0] == HTTPRequest.RESULT_SUCCESS and answer[1] == 200
-	return (answer[3] as PackedByteArray).get_string_from_utf8() if ok else ""
+## [param count] different numbers between [param low] and [param high] (inclusive).
+func _distinct(count: int, low: int, high: int) -> Array[int]:
+	var pool: Array[int] = []
+	for n: int in range(low, high + 1):
+		pool.append(n)
+	_shuffle(pool)
+	return pool.slice(0, mini(count, pool.size()))
+
+
+func _shuffle(items: Array) -> void:
+	for i: int in range(items.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var swap: Variant = items[i]
+		items[i] = items[j]
+		items[j] = swap
 
 
 func _save(entries: Array[Dictionary]) -> void:

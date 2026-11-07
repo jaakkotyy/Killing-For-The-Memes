@@ -30,6 +30,9 @@ var game_match: GameMatch
 var config: GameConfig = GameConfig.new()
 ## Template ids memes may use (from data/meme_templates.json); empty accepts any valid id.
 var allowed_templates: PackedStringArray = []
+## When set, decides instead which template ids memes may use (id -> bool); see
+## GameMatch.template_accepts.
+var template_accepts: Callable
 ## Seeds the match's shuffles and tie-breaks; 0 picks a random seed.
 var rng_seed: int = 0
 
@@ -194,7 +197,9 @@ func _new_match() -> GameMatch:
 	if deck == null:
 		push_error("Prompt pack %s is missing or broken" % PROMPT_PACK_PATH)
 		deck = PromptDeck.new(PackedStringArray(["Make a meme about this room."]), rng)
-	return GameMatch.new(config, lobby.get_players(), deck, rng, allowed_templates)
+	var created := GameMatch.new(config, lobby.get_players(), deck, rng, allowed_templates)
+	created.template_accepts = template_accepts
+	return created
 
 
 func _after_intent(result: GameMatch.IntentResult) -> GameMatch.IntentResult:

@@ -18,6 +18,12 @@ signal match_updated(view: MatchView, previous: MatchView)
 signal returned_to_lobby
 ## The session is over. An empty reason means the local player chose to leave.
 signal session_ended(reason: String)
+## Host only: a player (maybe the host) wants templates matching [param query]. App's
+## TemplateSearch answers through send_template_search_results().
+signal template_search_requested(peer_id: int, query: String)
+## Your template search finished. [param entries] come from the host: validate them
+## (TemplateCatalogue.sanitize) before use.
+signal template_search_finished(query: String, entries: Array)
 
 ## Seconds between sending a rejection and disconnecting the peer, so the message arrives.
 const _KICK_DELAY: float = 0.5
@@ -33,6 +39,8 @@ var auto_start: bool = false
 var host_config: GameConfig = GameConfig.new()
 ## Host only: template ids memes may use. App fills this from the template library.
 var allowed_templates: PackedStringArray = []
+## Host only: when set, decides instead which template ids memes may use (id -> bool).
+var template_accepts: Callable
 ## Host only: the online template catalogue sent to everyone when a game starts.
 var template_catalogue: Array[Dictionary] = []
 ## The online templates of the running game, as the host sent them (untrusted on clients:
@@ -113,6 +121,25 @@ func set_template_catalogue(entries: Array[Dictionary], allowed: PackedStringArr
 	return true
 
 
+## Searches the online templates (through the host, which holds the API keys).
+## [signal template_search_finished] answers.
+func search_templates(query: String) -> void:
+	if is_host():
+		template_search_requested.emit(local_peer_id(), query)
+	elif Net.is_joined():
+		_rpc_search_templates.rpc_id(1, query)
+
+
+## Host only: the answer to a template_search_requested.
+func send_template_search_results(peer_id: int, query: String, entries: Array[Dictionary]) -> void:
+	if not is_host():
+		return
+	if peer_id == local_peer_id():
+		template_search_finished.emit(query, entries)
+	elif lobby.has_player(peer_id):
+		_rpc_template_search_results.rpc_id(peer_id, query, entries)
+
+
 ## Host only. Ignored unless the lobby can start.
 func request_start() -> void:
 	if is_host():
@@ -188,6 +215,7 @@ func _on_net_hosted() -> void:
 	_server = ServerController.new(min_players)
 	_server.config = host_config
 	_server.allowed_templates = allowed_templates
+	_server.template_accepts = template_accepts
 	_server.rng_seed = host_seed
 	_server.lobby_changed.connect(_on_server_lobby_changed)
 	_server.join_rejected.connect(_on_server_join_rejected)
@@ -297,6 +325,13 @@ func _rpc_shoot() -> void:
 		_server.handle_shoot(multiplayer.get_remote_sender_id(), _clock)
 
 
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_search_templates(query: Variant) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if _server != null and lobby.has_player(sender) and typeof(query) == TYPE_STRING:
+		template_search_requested.emit(sender, query)
+
+
 # --- RPCs: server → client ----------------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
@@ -323,6 +358,11 @@ func _rpc_match_snapshot(snapshot: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _rpc_returned_to_lobby(snapshot: Dictionary) -> void:
 	_apply_returned_to_lobby(snapshot)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_template_search_results(query: String, entries: Array) -> void:
+	template_search_finished.emit(query, entries)
 
 
 # --- Local state --------------------------------------------------------------------------

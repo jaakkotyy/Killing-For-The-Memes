@@ -16,12 +16,20 @@ func setup(room: GameRoom) -> void:
 	_station = room.get_station()
 	if _station != null:
 		_station.meme_submitted.connect(Session.submit_meme)
+		_station.editor.search_requested.connect(Session.search_templates)
+		Session.template_search_finished.connect(_on_template_search_finished)
 	Session.match_updated.connect(apply)
 	if Session.match_view != null:
 		apply(Session.match_view, null)
 	else:
 		room.set_editing_allowed(false)
 		_tv().show_caption(tr("GET READY"), tr("The game is about to begin."))
+
+
+## The host answered our template search: remember what it found and show it.
+func _on_template_search_finished(query: String, entries: Array) -> void:
+	var editor: MemeEditor = _station.editor
+	editor.show_search_results(query, editor.library.add_found(TemplateCatalogue.sanitize(entries)))
 
 
 func apply(view: MatchView, previous: MatchView) -> void:

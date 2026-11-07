@@ -50,10 +50,10 @@ static func get_instance() -> TemplateImageCache:
 
 ## Where [param url]'s file is cached on disk.
 static func cache_path(url: String) -> String:
-	return CACHE_DIR + url.md5_text() + "." + url.get_extension().to_lower()
+	return CACHE_DIR + url.md5_text() + "." + url.get_slice("?", 0).get_extension().to_lower()
 
 
-## Decodes a still: JPG, PNG or the first frame of a GIF (whatever the extension claims),
+## Decodes a still: JPG, PNG, WebP or the first frame of a GIF (whatever the extension claims),
 ## scaled down to MAX_TEXTURE_SIDE. Returns null for anything that isn't a sane image.
 static func decode(bytes: PackedByteArray) -> Image:
 	if bytes.is_empty() or bytes.size() > MAX_BYTES:
@@ -64,10 +64,18 @@ static func decode(bytes: PackedByteArray) -> Image:
 	# Check the signature first: Godot's decoders log engine errors on junk.
 	var is_png: bool = bytes.size() >= 8 and bytes[0] == 0x89 and bytes[1] == 0x50 and bytes[2] == 0x4E and bytes[3] == 0x47
 	var is_jpg: bool = bytes.size() >= 4 and bytes[0] == 0xFF and bytes[1] == 0xD8 and bytes[2] == 0xFF
-	if not is_png and not is_jpg:
+	var is_webp: bool = bytes.size() >= 12 and bytes.slice(0, 4).get_string_from_ascii() == "RIFF" \
+		and bytes.slice(8, 12).get_string_from_ascii() == "WEBP"
+	if not is_png and not is_jpg and not is_webp:
 		return null
 	var image := Image.new()
-	var err: Error = image.load_png_from_buffer(bytes) if is_png else image.load_jpg_from_buffer(bytes)
+	var err: Error
+	if is_png:
+		err = image.load_png_from_buffer(bytes)
+	elif is_jpg:
+		err = image.load_jpg_from_buffer(bytes)
+	else:
+		err = image.load_webp_from_buffer(bytes)
 	if err != OK or image.is_empty():
 		return null
 	var longest: int = maxi(image.get_width(), image.get_height())
