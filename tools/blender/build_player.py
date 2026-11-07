@@ -9,9 +9,14 @@
 # automatic weights, write clothing masks into vertex colours, create the animations and export
 # assets/models/player/player.glb.
 #
+# Animations: the keyboard pose, flinch and look-up are keyed here; the relaxed idles, the
+# sip and the wave are retargeted from the artist's Meshy/Mixamo FBX (--animations, see
+# retarget_mixamo.py). Without --animations only the keyed ones are built.
+#
 # Usage (Blender 2.81):
 #   blender -b --factory-startup "<Player Model.blend>" --python build_player.py -- \
 #       --out <repo>/assets/models/player [--skip-bake] [--bake-size 2048] [--preview <png prefix>]
+#       [--animations <animated.fbx>]
 import argparse
 import math
 import os
@@ -19,6 +24,9 @@ import sys
 
 import bpy
 from mathutils import Matrix, Quaternion, Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import retarget_mixamo  # noqa: E402
 
 TARGET_HEIGHT = 1.8
 FPS = 30
@@ -82,6 +90,7 @@ def parse_args():
 	parser.add_argument("--skip-bake", action="store_true")
 	parser.add_argument("--bake-size", type=int, default=2048)
 	parser.add_argument("--preview", default="")
+	parser.add_argument("--animations", default="")
 	return parser.parse_args(argv)
 
 
@@ -266,6 +275,24 @@ EYES = (1.86, 0.0, 2.74)  # source-space point between the eyes, for the first-p
 # A hat band sits this far down the head (fraction of the head's height, top = 0).
 HAT_BAND_DEPTH = 0.3
 
+# The table top as src/world/room/room.gd builds it (keep in sync): its surface is just
+# under the typing forearms, it is this thick, and its edge is this far in front of the
+# knees. Retargeted clips are kept out of it.
+TABLE_BELOW_FOREARMS = 0.01
+TABLE_THICKNESS = 0.06
+TABLE_EDGE = 0.05
+
+# Retargeted clips: (our action name, part of the source take's name). "_loop" makes Godot
+# loop the clip. The source's walking, running and floor-sitting takes are not used: players
+# never leave their chairs.
+RETARGETED_CLIPS = [
+	("relax_still_loop", "_01a1b24f"),  # sits back, a hand on the knee
+	("relax_lean_loop", "Chair_Sit_Idle_M"),  # leans forward onto the knees
+	("relax_fidget_loop", "Chair_Sit_Idle_F"),  # shifts about, rubs the face
+	("drink", "Sit_and_Drink"),
+	("stand_wave", "Stand_Wave_and_Sit_Down"),  # the winner
+]
+
 
 def with_changes(base, changes):
 	pose = dict(base)
@@ -382,18 +409,64 @@ def measure_hat_band(low, head_group):
 	}
 
 
-def write_metrics(rig, low, sit, game_matrix, out_dir):
+def seat_contact(rig, low):
+	"""Height of the lowest point of the backside in the current pose: where it rests on the seat."""
+	points = posed_vertices(low)
+	hips = rig.pose.bones["Hips"].head
+	return min(p.z for p in points if abs(p.y - hips.y) < 0.1 and abs(p.x - hips.x) < 0.18)
+
+
+def forearm_bottom(rig, low):
+	"""Lowest point of the forearms and hands in the current pose (the table goes just under)."""
+	points = posed_vertices(low)
+	group_index = {g.name: g.index for g in low.vertex_groups}
+	forearm_ids = {group_index[n] for n in ("LowerArm.L", "LowerArm.R", "Hand.L", "Hand.R")}
+	return min(points[v.index].z for v in low.data.vertices
+		if any(g.group in forearm_ids and g.weight > 0.5 for g in v.groups))
+
+
+# Body parts checked against the table in retargeted clips. Only forearms and hands count
+# for the arms: the elbows' undersides already dip below the table top in the typing pose
+# (the table height is set by the forearms).
+TORSO_BONES = {"Spine", "Chest", "Neck", "Head", "Shoulder.L", "Shoulder.R"}
+# Forearms may pass under the table edge this far in (hands in the lap).
+FOREARM_EDGE_ALLOWANCE = 0.10
+
+
+def vertices_of(low, bones):
+	"""Indices of the vertices mostly weighted to `bones`."""
+	names = {g.index: g.name for g in low.vertex_groups}
+	result = []
+	for v in low.data.vertices:
+		if v.groups and names[max(v.groups, key=lambda g: g.weight).group] in bones:
+			result.append(v.index)
+	return result
+
+
+def table_penetration(low, table_top, indices, edge_allowance=0.0):
+	"""How deep (m) the posed vertices `indices` are inside the table top (0 when clear).
+	Under the table is free space: the legs are always there. edge_allowance ignores the
+	first metres in from the edge: hands in the lap pass under the edge, which looks right
+	(the edge is level with the belly); a hand sinking into the top further in does not."""
+	bottom = table_top - TABLE_THICKNESS
+	points = posed_vertices(low)
+	deepest = 0.0
+	for i in indices:
+		p = points[i]
+		inset = -TABLE_EDGE - p.y
+		if inset > edge_allowance and bottom < p.z < table_top:
+			deepest = max(deepest, min(table_top - p.z, p.z - bottom, inset - edge_allowance))
+	return deepest
+
+
+def write_metrics(rig, low, sit, game_matrix, out_dir, animations):
 	"""Measures the seated pose so the room can size chairs and the table to the character."""
 	import json
 	apply_pose(rig, SEATED, sit)
 	points = posed_vertices(low)
 	hips = rig.pose.bones["Hips"].head
-	seat_height = min(p.z for p in points if abs(p.y - hips.y) < 0.1 and abs(p.x) < 0.18)
-	forearm_names = {"LowerArm.L", "LowerArm.R", "Hand.L", "Hand.R"}
+	seat_height = seat_contact(rig, low)
 	group_index = {g.name: g.index for g in low.vertex_groups}
-	forearm_ids = {group_index[n] for n in forearm_names}
-	forearm_z = [points[v.index].z for v in low.data.vertices
-		if any(g.group in forearm_ids and g.weight > 0.5 for g in v.groups)]
 	head = rig.pose.bones["Head"]
 	rest = rig.data.bones["Head"].matrix_local
 	eyes = head.matrix @ rest.inverted() @ (game_matrix @ Vector(EYES))
@@ -404,13 +477,13 @@ def write_metrics(rig, low, sit, game_matrix, out_dir):
 			"Generated by tools/blender/build_player.py.",
 		"height": TARGET_HEIGHT,
 		"seat_height": round(seat_height, 4),
-		"forearm_bottom": round(min(forearm_z), 4),
+		"forearm_bottom": round(forearm_bottom(rig, low), 4),
 		"seated_eyes": to_godot(eyes),
 		"seated_hips": to_godot(hips),
 		"seated_wrist_l": to_godot(wrists["L"]),
 		"seated_wrist_r": to_godot(wrists["R"]),
 		"hat_band": hat_band,
-		"animations": ["seated_idle", "flinch", "look_up", "a_pose"],  # names after Godot import
+		"animations": animations,  # names after Godot import
 	}
 	path = os.path.join(out_dir, "player_metrics.json")
 	with open(path, "w", newline="\n") as handle:
@@ -428,6 +501,50 @@ def make_animations(rig, sit):
 		(1, SEATED, sit), (4, FLINCH, flinch_sit), (10, FLINCH, flinch_sit), (24, SEATED, sit)])
 	make_action(rig, "look_up", [(1, SEATED, sit), (12, LOOK_UP, sit)])
 	make_action(rig, "a_pose", [(1, {}, Vector())])
+
+
+def retarget_clips(rig, low, sit, fbx_path):
+	"""Retargets RETARGETED_CLIPS from the FBX; returns {name: per-frame poses} for previews."""
+	source = retarget_mixamo.import_source(fbx_path)
+	top = (source.matrix_world @ source.data.bones["mixamorig:HeadTop_End"].head_local).z
+	scale = TARGET_HEIGHT / top
+	apply_pose(rig, SEATED, sit)
+	seat_height = seat_contact(rig, low)
+	table_top = forearm_bottom(rig, low) - TABLE_BELOW_FOREARMS
+	hips_head = rig.data.bones["Hips"].head_local + sit
+	torso = vertices_of(low, TORSO_BONES)
+	arms = {side: vertices_of(low, {"LowerArm." + side, "Hand." + side}) for side in ("L", "R")}
+	print("RETARGET typing pose: forearms %.3f m and torso %.3f m inside the table" % (
+		max(table_penetration(low, table_top, a) for a in arms.values()), table_penetration(low, table_top, torso)))
+	clips = {}
+	for name, take in RETARGETED_CLIPS:
+		action = retarget_mixamo.find_action(take)
+		_, poses = retarget_mixamo.retarget(rig, source, action, name, hips_head, scale,
+			lambda r: seat_contact(r, low), seat_height,
+			body_penetration=lambda r: table_penetration(low, table_top, torso),
+			arm_penetration=lambda r, side: table_penetration(low, table_top, arms[side], FOREARM_EDGE_ALLOWANCE))
+		clips[name] = poses
+	retarget_mixamo.remove_source(source)
+	rig.animation_data.action = None
+	return clips
+
+
+def render_clip_previews(prefix, rig, clips, frames_per_clip=4):
+	"""Front and side renders of a few frames of every retargeted clip (needs render_preview's
+	scene: camera, light, floor)."""
+	scene = bpy.context.scene
+	cam = scene.camera
+	for name, poses in clips.items():
+		for i in range(frames_per_clip):
+			index = round((len(poses) - 1) * i / max(1, frames_per_clip - 1))
+			retarget_mixamo.apply_frame(rig, poses[index])
+			for label, cam_pos in (("front", (2.0, -2.6, 1.3)), ("side", (3.0, 0.0, 0.9))):
+				look_at = Vector((0, 0, 0.6 if name != "stand_wave" else 0.9))
+				cam.location = Vector(cam_pos)
+				cam.rotation_euler = (look_at - cam.location).to_track_quat("-Z", "Y").to_euler()
+				scene.render.filepath = "%s_%s_%d_%s.png" % (prefix, name, i, label)
+				bpy.ops.render.render(write_still=True)
+		print("WROTE", "%s_%s_*.png" % (prefix, name))
 
 
 def render_preview(prefix, rig, low, sit):
@@ -505,11 +622,17 @@ def main():
 	write_masks(low)
 	preview_material(low, maps)
 	sit = calibrate_seat(rig, low)
-	write_metrics(rig, low, sit, game, args.out)
+	animations = ["seated_idle", "flinch", "look_up", "a_pose"]
+	if args.animations:
+		animations += [name[:-5] if name.endswith("_loop") else name for name, _ in RETARGETED_CLIPS]
+	write_metrics(rig, low, sit, game, args.out, animations)
 	make_animations(rig, sit)
+	clips = retarget_clips(rig, low, sit, args.animations) if args.animations else {}
 	if args.preview:
 		render_preview(args.preview, rig, low, sit)
+		render_clip_previews(args.preview, rig, clips)
 	export(rig, low, args.out)
 
 
-main()
+if __name__ == "__main__":
+	main()

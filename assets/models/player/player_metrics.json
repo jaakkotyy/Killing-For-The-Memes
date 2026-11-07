@@ -37,6 +37,11 @@
 		"seated_idle",
 		"flinch",
 		"look_up",
-		"a_pose"
+		"a_pose",
+		"relax_still",
+		"relax_lean",
+		"relax_fidget",
+		"drink",
+		"stand_wave"
 	]
 }

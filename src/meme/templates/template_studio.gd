@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _capture_all() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MemeTemplateLibrary.IMAGE_DIR))
-	for id: String in MemeTemplateLibrary.get_default().ids():
+	for id: String in MemeTemplateLibrary.get_default().original_ids():
 		_reset()
 		if not has_method("_shot_" + id):
 			push_error("No studio shot for template '%s'" % id)
@@ -57,21 +57,16 @@ func _save(id: String) -> void:
 
 func _reset() -> void:
 	_room.call("focus_spotlight", 0)
-	_host().set_expression(&"grin")
 	for id: int in range(1, PLAYERS + 1):
 		var seat: Seat = _seat(id)
 		seat.avatar.visible = true
 		seat.monitor.visible = true
 		seat.avatar.set_label_visible(false)
-		seat.avatar.idle()
+		seat.avatar.type_on_keyboard()
 
 
 func _seat(id: int) -> Seat:
 	return _room.call("get_seat", id) as Seat
-
-
-func _host() -> TheHost:
-	return _room.call("get_host") as TheHost
 
 
 func _look(eye: Vector3, target: Vector3, fov: float) -> void:
@@ -79,30 +74,7 @@ func _look(eye: Vector3, target: Vector3, fov: float) -> void:
 	_camera.fov = fov
 
 
-func _host_forward() -> Vector3:
-	return _host().global_basis.z.normalized()
-
-
 # --- Shots (one per template id in data/meme_templates.json) ----------------------------
-
-func _shot_host_grin() -> void:
-	var head: Vector3 = _host().get_head_position() + Vector3.UP * 0.2
-	_look(head + _host_forward() * 0.95 + Vector3.UP * 0.05, head, 38.0)
-
-
-func _shot_host_sinister() -> void:
-	_host().set_expression(&"sinister")
-	var head: Vector3 = _host().get_head_position() + Vector3.UP * 0.2
-	var side: Vector3 = _host_forward().cross(Vector3.UP).normalized()
-	_look(head + _host_forward() * 1.1 + side * 0.35 + Vector3.DOWN * 0.75, head, 42.0)
-
-
-func _shot_host_shocked() -> void:
-	_host().set_expression(&"surprised")
-	var head: Vector3 = _host().get_head_position() + Vector3.UP * 0.2
-	var side: Vector3 = _host_forward().cross(Vector3.UP).normalized()
-	_look(head + _host_forward() * 0.8 - side * 0.3, head, 46.0)
-
 
 func _shot_spotlight_flinch() -> void:
 	var seat: Seat = _seat(3)

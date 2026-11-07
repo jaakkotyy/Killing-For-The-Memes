@@ -14,6 +14,7 @@ func _make_match(player_count: int, seed_value: int = 1, bullets: int = 2) -> Ga
 	rng.seed = seed_value
 	config = GameConfig.new()
 	config.bullets_per_player = bullets
+	config.host_paces_spotlight = false
 	var deck := PromptDeck.new(PackedStringArray(["prompt one", "prompt two", "prompt three"]), rng)
 	return GameMatch.new(config, players, deck, rng)
 
@@ -133,6 +134,18 @@ func test_allowed_templates_are_enforced() -> void:
 	restricted.update(restricted.phase_ends_at)
 	assert_eq(restricted.submit_meme(1, MEME, 6.0), GameMatch.IntentResult.INVALID)
 	assert_eq(restricted.submit_meme(1, {"template_id": "office_fire"}, 6.0), GameMatch.IntentResult.OK)
+
+
+func test_template_accepts_overrides_the_allowed_list() -> void:
+	var players: Array[LobbyPlayer] = [LobbyPlayer.new(1, "A", 0), LobbyPlayer.new(2, "B", 1)]
+	var rng := RandomNumberGenerator.new()
+	var custom := GameMatch.new(GameConfig.new(), players, PromptDeck.new(PackedStringArray(["p"]), rng), rng, PackedStringArray(["office_fire"]))
+	custom.template_accepts = func(id: String) -> bool: return id.begins_with("imgflip-")
+	custom.start(0.0)
+	custom.update(custom.phase_ends_at)
+	assert_eq(custom.submit_meme(1, {"template_id": "imgflip-found1"}, 6.0), GameMatch.IntentResult.OK)
+	assert_eq(custom.submit_meme(1, {"template_id": "office_fire"}, 6.0), GameMatch.IntentResult.INVALID)
+	assert_eq(custom.submit_meme(1, {"template_id": "imgflip-bad id"}, 6.0), GameMatch.IntentResult.INVALID)
 
 
 # --- Voting and shooting ------------------------------------------------------------------
@@ -383,3 +396,58 @@ func test_same_seed_plays_out_the_same() -> void:
 	assert_eq(outcomes[0], outcomes[1], "same seed, same deaths in the same order")
 	assert_eq((outcomes[0][0] as Array).size(), 4)
 	assert_ne(outcomes[0], outcomes[2], "a different seed plays out differently")
+
+
+# --- Host-paced spotlight -------------------------------------------------------------
+
+func _paced_match() -> GameMatch:
+	var game := _make_match(3)
+	config.host_paces_spotlight = true
+	game.start(0.0)
+	match_ = game
+	_skip_to(GameMatch.Phase.CREATE)
+	_submit_all()
+	assert_eq(game.phase, GameMatch.Phase.SPOTLIGHT)
+	return game
+
+
+func test_a_host_paced_spotlight_waits_for_the_host() -> void:
+	var game := _paced_match()
+	var first: int = game.current_spotlight_id()
+	game.update(1.0e9)
+	assert_eq(game.current_spotlight_id(), first, "no timer")
+	assert_true(game.is_untimed())
+	assert_eq(game.to_snapshot(1.0e9, 1)["time_left"], -1.0)
+	assert_eq(game.present_next(game.current_spotlight_index(), 50.0), GameMatch.IntentResult.OK)
+	assert_ne(game.current_spotlight_id(), first)
+
+
+func test_present_next_ignores_a_stale_press() -> void:
+	var game := _paced_match()
+	var index: int = game.current_spotlight_index()
+	assert_eq(game.present_next(index, 50.0), GameMatch.IntentResult.OK)
+	var second: int = game.current_spotlight_id()
+	# The same press arriving twice must not skip the second meme.
+	assert_eq(game.present_next(index, 50.0), GameMatch.IntentResult.ALREADY_DONE)
+	assert_eq(game.current_spotlight_id(), second)
+	assert_eq(game.present_next("next", 50.0), GameMatch.IntentResult.INVALID)
+
+
+func test_presenting_past_the_last_meme_shows_the_results() -> void:
+	var game := _paced_match()
+	for i: int in range(3):
+		assert_eq(game.present_next(game.current_spotlight_index(), 50.0), GameMatch.IntentResult.OK)
+	assert_eq(game.phase, GameMatch.Phase.ELIMINATION)
+	assert_false(game.is_untimed(), "the results are timed again")
+	assert_eq(game.present_next(2, 51.0), GameMatch.IntentResult.WRONG_PHASE)
+
+
+func test_the_snapshot_counts_judges_but_hides_votes() -> void:
+	var game := _paced_match()
+	var target: int = game.current_spotlight_id()
+	var voter: int = 1 if target != 1 else 2
+	game.cast_vote(voter, -1, 50.0)
+	var spotlight: Dictionary = game.to_snapshot(50.0, target)["spotlight"]
+	assert_eq(spotlight["judged"], 1)
+	assert_eq(spotlight["judges"], 2)
+	assert_eq(game.to_snapshot(50.0, target)["my_vote"], 0, "the target never sees the vote")

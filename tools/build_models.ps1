@@ -9,13 +9,16 @@
 #   .\tools\build_models.ps1 -PropsOnly              # skip the player: hat and table props only
 #
 # Sources: -AssetsDir, else $env:KFTM_ASSETS, else D:\Killing-For-The-Memes-Assets.
+# The player's extra animations (relaxed idles, sip, wave) are retargeted from the Meshy FBX
+# in -Animations (default: the one under <AssetsDir>\meshy); without it they are skipped.
 # Blender 2.81+: -Blender, else $env:BLENDER, else D:\Blender\blender.exe.
 param(
     [string]$AssetsDir = "",
     [string]$Blender = "",
     [switch]$SkipBake,
     [string]$Preview = "",
-    [switch]$PropsOnly
+    [switch]$PropsOnly,
+    [string]$Animations = ""
 )
 
 . "$PSScriptRoot\godot_path.ps1"
@@ -47,7 +50,13 @@ if (-not $PropsOnly) {
     $blenderArgs = @("-b", "--factory-startup", "`"$playerSource`"", "--python", "`"$script`"", "--", "--out", "`"$outDir`"")
     if ($SkipBake) { $blenderArgs += "--skip-bake" }
     if ($Preview) { $blenderArgs += @("--preview", "`"$(Join-Path $Preview 'player')`"") }
-    Invoke-BlenderExport "player from '$playerSource'" $blenderArgs (Join-Path $env:TEMP "kftm_build_player.log") "WROTE|SKIN|SEAT|ACTION"
+    if (-not $Animations) { $Animations = Join-Path $AssetsDir "meshy\Meshy_AI_Player_Model_20261106_animated_mixamo_All_animation.fbx" }
+    if (Test-Path $Animations) {
+        $blenderArgs += @("--animations", "`"$Animations`"")
+    } else {
+        Write-Warning "No animation FBX at '$Animations'; building without the retargeted animations."
+    }
+    Invoke-BlenderExport "player from '$playerSource'" $blenderArgs (Join-Path $env:TEMP "kftm_build_player.log") "WROTE|SKIN|SEAT|ACTION|RETARGET"
 }
 
 # The hat is fitted to the head ring in player_metrics.json, so it comes after the player.

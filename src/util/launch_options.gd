@@ -12,6 +12,11 @@ extends RefCounted
 ##   --auto-start         (host) start as soon as the lobby allows it
 ##   --min-players=<n>    override the minimum player count (debug builds only)
 ##   --smoke-test         quit with exit code 0 once the game starts, non-zero on failure
+##   --smoke-test=game    the same, but only once a whole game has been played to the end
+##   --auto-play          a bot plays for you: submits memes, votes and sometimes shoots (dev)
+##   --fast-rounds        (host) very short phases, for automated full games (debug builds only)
+##   --seed=<n>           (host) fixed seed for prompts, spotlight order and tie-breaks
+##   --offline-templates  (host) only our original templates; don't fetch popular ones
 ##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
 ##   --room-camera=<view> first room camera: seat (default), tv, overview, or editor
 ##                        (starts zoomed into your CRT's meme editor)
@@ -25,6 +30,13 @@ var auto_start: bool = false
 ## 0 means "not set".
 var min_players: int = 0
 var smoke_test: bool = false
+## With --smoke-test=game: pass only after GAME_OVER instead of at the start.
+var smoke_test_full_game: bool = false
+var auto_play: bool = false
+var fast_rounds: bool = false
+## 0 means "random".
+var seed_value: int = 0
+var offline_templates: bool = false
 ## 0 means "not set"; otherwise the number of fake players in the room preview.
 var room_preview: int = 0
 ## "" (seat), "seat", "tv", "overview" or "editor".
@@ -61,6 +73,16 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 					options.min_players = clampi(value.to_int(), 1, Protocol.MAX_PLAYERS)
 			"--smoke-test":
 				options.smoke_test = true
+				options.smoke_test_full_game = value == "game"
+			"--auto-play":
+				options.auto_play = true
+			"--fast-rounds":
+				options.fast_rounds = true
+			"--offline-templates":
+				options.offline_templates = true
+			"--seed":
+				if value.is_valid_int():
+					options.seed_value = value.to_int()
 			"--room-preview":
 				if value.is_valid_int():
 					options.room_preview = clampi(value.to_int(), 1, Protocol.MAX_PLAYERS)

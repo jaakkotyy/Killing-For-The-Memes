@@ -51,6 +51,10 @@ It prints `SKIN groups=21 unweighted_verts=0 / 9974`, the seat calibration and o
    `SEATED`/`FLINCH` dictionaries and `make_action()`.
 5. Godot strips a `_loop` suffix from animation names and loops them. Update the names in
    `src/world/player/player_avatar.gd` when adding animations.
+   Animations made elsewhere (Meshy, Mixamo, any FBX with a `mixamorig:` rig) are
+   retargeted, not imported: add the take to `RETARGETED_CLIPS` in `build_player.py`.
+   Check the `RETARGET` lines in the build log, then the clip previews (`-Preview`), and
+   the clip in the room against the table (not only in an empty Blender scene).
 6. **Accessories** (the hat): fitted in Blender to a ring measured on the rest-pose body
    (`hat_band` in `player_metrics.json`) and exported in the player's model space by
    `tools/blender/build_hat.py`; `PlayerAvatar` attaches it to the `Head` bone. Check a

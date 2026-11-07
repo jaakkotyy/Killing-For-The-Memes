@@ -3,6 +3,10 @@ extends Control
 ## Draws a MemeSpec: the template image with classic top/bottom captions (white, uppercase,
 ## thick black outline), shrinking the text until it fits. Every client renders memes from
 ## the spec locally; the editor preview and the wall TV both use this control.
+##
+## The meme is always a 4:3 frame. Templates of other shapes (most online ones) are
+## letterboxed inside it on black, and the captions sit on the image itself. GIF templates
+## play (looping) once their animation has loaded, showing their still until then.
 
 ## Caption boxes as fractions of the meme's rect.
 const TOP_BOX: Rect2 = Rect2(0.04, 0.025, 0.92, 0.25)
@@ -16,16 +20,33 @@ static var _meme_font: Font
 
 var library: MemeTemplateLibrary
 var _spec: MemeSpec = MemeSpec.new()
+var _watched: MemeTemplateLibrary
+## When the current template started playing (Time.get_ticks_msec()).
+var _started_msec: int = 0
+var _animation: AnimatedTemplate
+var _shown_frame: int = -1
 
 
-## The bold caption font. A placeholder until the OFL meme font is added (see CREDITS.md).
+## The caption font: the real Impact, from the player's own system (every Windows has
+## it; nothing is shipped), then look-alikes. Without any of them, an emboldened default.
 static func meme_font() -> Font:
 	if _meme_font == null:
-		var variation := FontVariation.new()
-		variation.base_font = ThemeDB.fallback_font
-		variation.variation_embolden = 1.1
-		variation.spacing_glyph = 1
-		_meme_font = variation
+		var bold := FontVariation.new()
+		bold.base_font = ThemeDB.fallback_font
+		bold.variation_embolden = 1.1
+		bold.spacing_glyph = 1
+		_meme_font = bold
+		var system := SystemFont.new()
+		system.font_names = PackedStringArray(["Impact", "Haettenschweiler", "Anton", "Arial Black"])
+		system.font_weight = 700
+		# SystemFont falls back to some default font when none of the names exist; only use
+		# it when one of them really is installed.
+		var installed: PackedStringArray = OS.get_system_fonts()
+		for wanted: String in system.font_names:
+			if installed.has(wanted):
+				system.fallbacks = [bold]
+				_meme_font = system
+				break
 	return _meme_font
 
 
@@ -49,8 +70,21 @@ func _ready() -> void:
 
 
 func set_meme(spec: MemeSpec) -> void:
-	_spec = spec if spec != null else MemeSpec.new()
+	var next: MemeSpec = spec if spec != null else MemeSpec.new()
+	if next.template_id != _spec.template_id:
+		_started_msec = Time.get_ticks_msec()
+	_spec = next
 	queue_redraw()
+
+
+func _process(_delta: float) -> void:
+	# Redraw only when the GIF moves on to another frame.
+	if _animation != null and _animation.frame_index_at(_elapsed()) != _shown_frame:
+		queue_redraw()
+
+
+func _elapsed() -> float:
+	return (Time.get_ticks_msec() - _started_msec) / 1000.0
 
 
 func get_meme() -> MemeSpec:
@@ -59,22 +93,64 @@ func get_meme() -> MemeSpec:
 
 ## The 4:3 area the meme is drawn in, centred in this control.
 func meme_rect() -> Rect2:
-	var width: float = minf(size.x, size.y * ASPECT)
-	var height: float = width / ASPECT
-	return Rect2((size - Vector2(width, height)) / 2.0, Vector2(width, height))
+	return fit_rect(Rect2(Vector2.ZERO, size), ASPECT)
+
+
+## The largest rect of [param aspect] (width / height) centred in [param bounds].
+static func fit_rect(bounds: Rect2, aspect: float) -> Rect2:
+	var width: float = minf(bounds.size.x, bounds.size.y * aspect)
+	var height: float = width / aspect
+	return Rect2(bounds.position + (bounds.size - Vector2(width, height)) / 2.0, Vector2(width, height))
+
+
+## Where the template image (and so the captions) go inside the meme frame.
+func image_rect() -> Rect2:
+	var frame: Rect2 = meme_rect()
+	if library == null or _spec.is_blank():
+		return frame
+	return fit_rect(frame, library.aspect(_spec.template_id))
 
 
 func _draw() -> void:
 	var rect: Rect2 = meme_rect()
 	draw_rect(rect, Color.BLACK)
 	if _spec.is_blank():
+		_animation = null
+		set_process(false)
 		_draw_caption(tr("NO MEME SUBMITTED"), rect, Rect2(0.1, 0.4, 0.8, 0.2), false, Color(0.55, 0.55, 0.55))
 		return
+	_watch(library)
+	var image: Rect2 = image_rect()
 	var texture: Texture2D = library.texture(_spec.template_id) if library != null else null
+	_animation = library.animation(_spec.template_id) if library != null else null
+	if _animation != null and _animation.frame_count() > 0:
+		_shown_frame = _animation.frame_index_at(_elapsed())
+		texture = _animation.textures[_shown_frame]
+	set_process(_animation != null and _animation.frame_count() > 1)
 	if texture != null:
-		draw_texture_rect(texture, rect, false)
-	_draw_caption(_spec.top_text.to_upper(), rect, TOP_BOX, true, Color.WHITE)
-	_draw_caption(_spec.bottom_text.to_upper(), rect, BOTTOM_BOX, false, Color.WHITE)
+		draw_texture_rect(texture, image, false)
+	elif library != null and library.is_online(_spec.template_id):
+		var waiting: String = tr("IMAGE UNAVAILABLE") if library.image_failed(_spec.template_id) else tr("LOADING...")
+		draw_rect(image, Color(0.08, 0.08, 0.08))
+		_draw_caption(waiting, image, Rect2(0.1, 0.42, 0.8, 0.16), false, Color(0.5, 0.5, 0.5))
+	_draw_caption(_spec.top_text.to_upper(), image, TOP_BOX, true, Color.WHITE)
+	_draw_caption(_spec.bottom_text.to_upper(), image, BOTTOM_BOX, false, Color.WHITE)
+
+
+## Redraw when the image we are waiting for arrives.
+func _watch(target: MemeTemplateLibrary) -> void:
+	if target == _watched:
+		return
+	if _watched != null and _watched.image_updated.is_connected(_on_image_updated):
+		_watched.image_updated.disconnect(_on_image_updated)
+	_watched = target
+	if _watched != null:
+		_watched.image_updated.connect(_on_image_updated)
+
+
+func _on_image_updated(id: String) -> void:
+	if id == _spec.template_id:
+		queue_redraw()
 
 
 func _draw_caption(text: String, rect: Rect2, box_fraction: Rect2, align_top: bool, color: Color) -> void:

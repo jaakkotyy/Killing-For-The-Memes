@@ -29,9 +29,11 @@ The script runs Blender headless and never saves the source file.
 4. **Clothing masks** in vertex colours, from the bone weights: R = shirt (torso, upper
    arms), G = trousers (hips, legs), B = shoes. The game shader
    (`src/world/player/player_body.gdshader`) tints them per player.
-5. **Animations** (aimed poses, keyed): `seated_idle_loop` (breathing), `flinch`,
-   `look_up`, `a_pose`. Godot strips `_loop` and makes that one loop, so in game the names
-   are `seated_idle`, `flinch`, `look_up`, `a_pose`.
+5. **Animations** (aimed poses, keyed): `seated_idle_loop` (breathing, hands on the
+   keyboard), `flinch`, `look_up`, `a_pose`. Godot strips `_loop` and makes that one loop,
+   so in game the names are `seated_idle`, `flinch`, `look_up`, `a_pose`. Then the
+   **retargeted clips** from the Meshy FBX (see below): `relax_still`, `relax_lean`,
+   `relax_fidget` (loops), `drink`, `stand_wave`.
 6. **Calibrate and measure** the seated pose: the pelvis drops until the feet touch the
    floor, then `player_metrics.json` records seat height, forearm height, eye and wrist
    positions (Godot model space). The room sizes chairs and the table from it, so changing
@@ -51,6 +53,31 @@ renders A-pose, seated, seated side and flinch).
 Poses are dictionaries of **world directions** per bone (Blender game space: −Y forward,
 +Z up, +X = character's left); `sided()` mirrors `.L` entries to `.R`. Add a pose, add a
 `make_action()` call with keyframes, rebuild, and play it from `PlayerAvatar`.
+
+### Retargeted animations (Meshy / Mixamo FBX)
+
+The artist rigged and animated the player in Meshy, which exports a Mixamo-style rig
+(`mixamorig:Hips` ...) with several takes in one FBX:
+`<assets>\meshy\Meshy_AI_Player_Model_20261106_animated_mixamo_All_animation.fbx`
+(`build_models.ps1 -Animations <fbx>` picks another one). `tools/blender/retarget_mixamo.py`
+copies takes onto our rig, so the hat, clothing masks and metrics keep working:
+
+- Each of our bones follows one source bone's **world rotation relative to its rest pose**
+  (`BONE_MAP`). Both rigs were made from the same A-posed body, so this keeps twists and
+  head turns. Hip motion is scaled to our height and added to our seated hips.
+- Each clip is lifted or lowered (by about 1 cm) so the backside rests at our chair's seat
+  height in its first frame.
+- The takes were made for a chair without a table. The script keeps them out of ours
+  (`TABLE_*` in `build_player.py`, which must match `room.gd`). If the head or torso goes
+  into the table top, the torso's lean is scaled down (`relax_lean` and `relax_fidget` keep
+  55 %). If a hand would sink into the table top more than 10 cm in from the edge, that
+  arm turns about the shoulder until it clears, eased over about half a second. Hands in
+  the lap pass under the edge, which looks right because the edge is level with the belly.
+- Which takes are used, and their names, are in `RETARGETED_CLIPS`. Walking, running and
+  sitting on the floor are left out because players never leave their chairs.
+
+The build log prints one `RETARGET` line per clip (lift, lean, how often the arms were
+moved). `-Preview <dir>` also renders four frames of each clip, front and side.
 
 ## Hat (`Hat - Accessory.blend` → `assets/models/player/hat.glb`)
 

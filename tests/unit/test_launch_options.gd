@@ -42,3 +42,26 @@ func test_room_preview_flags_are_validated() -> void:
 	var options: LaunchOptions = LaunchOptions.parse(PackedStringArray(["--room-preview=40", "--room-camera=ceiling"]))
 	assert_eq(options.room_preview, Protocol.MAX_PLAYERS, "clamped to the maximum")
 	assert_eq(options.room_camera, "", "unknown views are ignored")
+
+
+func test_parses_round_loop_flags() -> void:
+	var options: LaunchOptions = LaunchOptions.parse(PackedStringArray([
+		"--smoke-test=game", "--auto-play", "--fast-rounds", "--seed=7",
+	]))
+	assert_true(options.smoke_test)
+	assert_true(options.smoke_test_full_game)
+	assert_true(options.auto_play)
+	assert_true(options.fast_rounds)
+	assert_eq(options.seed_value, 7)
+
+
+func test_plain_smoke_test_only_waits_for_the_start() -> void:
+	var options: LaunchOptions = LaunchOptions.parse(PackedStringArray(["--smoke-test", "--seed=x"]))
+	assert_true(options.smoke_test)
+	assert_false(options.smoke_test_full_game)
+	assert_eq(options.seed_value, 0)
+
+
+func test_offline_templates_flag() -> void:
+	assert_false(LaunchOptions.parse(PackedStringArray()).offline_templates)
+	assert_true(LaunchOptions.parse(PackedStringArray(["--offline-templates"])).offline_templates)

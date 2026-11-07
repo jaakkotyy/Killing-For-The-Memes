@@ -59,6 +59,42 @@ func get_eye_position() -> Vector3:
 	return to_global(PlayerAvatar.metric_vector("seated_eyes") + Vector3(0, 0, 0.07))
 
 
+## A muzzle flash from under the table edge: this player just fired at someone.
+func flash_shot(target: Vector3) -> void:
+	var flash := OmniLight3D.new()
+	flash.light_color = Color(1.0, 0.7, 0.35)
+	flash.light_energy = 6.0
+	flash.omni_range = 2.2
+	flash.position = Vector3(0.18, table_height + 0.05, table_edge + 0.25)
+	add_child(flash)
+	var sparks := CPUParticles3D.new()
+	sparks.one_shot = true
+	sparks.amount = 16
+	sparks.lifetime = 0.25
+	sparks.explosiveness = 1.0
+	sparks.spread = 12.0
+	sparks.initial_velocity_min = 2.5
+	sparks.initial_velocity_max = 4.0
+	sparks.gravity = Vector3.ZERO
+	var bit := SphereMesh.new()
+	bit.radius = 0.008
+	bit.height = 0.016
+	var hot := StandardMaterial3D.new()
+	hot.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hot.albedo_color = Color(1.0, 0.85, 0.4)
+	bit.material = hot
+	sparks.mesh = bit
+	flash.add_child(sparks)
+	var aim: Vector3 = target - flash.global_position
+	if aim.length_squared() > 0.0001:
+		sparks.direction = flash.global_basis.inverse() * aim.normalized()
+	sparks.emitting = true
+	var tween := flash.create_tween()
+	tween.tween_property(flash, "light_energy", 0.0, 0.15)
+	tween.tween_interval(0.3)
+	tween.tween_callback(flash.queue_free)
+
+
 ## Where a spotlight should aim to light this player.
 func get_spotlight_target() -> Vector3:
 	return to_global(Vector3(0, 0.95, -0.05))
