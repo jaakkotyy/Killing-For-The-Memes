@@ -5,13 +5,11 @@
 # -FullGame plays a whole match instead: every instance is a bot (--auto-play) on short
 # timers (--fast-rounds), and each must see GAME_OVER with a winner.
 #
-# Popular online templates are off by default so the test never depends on the internet;
-# -Online makes the host fetch them from Imgflip and every client download the images.
+# Portraits (Wikimedia Commons) are off by default so the test never depends on the
+# internet; -Online lets every instance download them. -Pack picks the identity pack
+# (default: the lobby's, musicians).
 #
-# -Mode guess plays guess mode ("Who Am I?") instead of the meme game; -Pack picks its
-# identity pack (default: musicians).
-#
-# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7] [-Online] [-Mode guess] [-Pack movies]
+# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7] [-Online] [-Pack movies]
 
 param(
     [ValidateRange(1, 7)][int]$Clients = 2,
@@ -20,7 +18,6 @@ param(
     [switch]$FullGame,
     [int]$Seed = 7,
     [switch]$Online,
-    [ValidateSet("memes", "guess")][string]$Mode = "memes",
     [string]$Pack = ""
 )
 
@@ -32,7 +29,7 @@ $SmokeArgs = @(if ($FullGame) {
 } else {
     "--smoke-test"
 })
-if (-not $Online) { $SmokeArgs += "--offline-templates" }
+if (-not $Online) { $SmokeArgs += "--offline-portraits" }
 
 . "$PSScriptRoot\godot_path.ps1"
 
@@ -54,7 +51,7 @@ function Start-Instance([string]$Name, [string[]]$GameArgs) {
     return [pscustomobject]@{ Name = $Name; Process = $proc; Log = $log }
 }
 
-$HostArgs = @("--host", "--port=$Port", "--auto-start", "--mode=$Mode")
+$HostArgs = @("--host", "--port=$Port", "--auto-start")
 if ($Pack) { $HostArgs += "--pack=$Pack" }
 $Instances += Start-Instance "Host" $HostArgs
 Start-Sleep -Milliseconds 1000

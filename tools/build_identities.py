@@ -30,7 +30,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "data" / "identities"
 CACHE_DIR = ROOT / ".identity_cache"
 ENDPOINT = "https://query.wikidata.org/sparql"
-USER_AGENT = "KillingForTheMemes-PackBuilder/0.1 (private party game; offline data build)"
+USER_AGENT = "Adrift-PackBuilder/0.1 (private party game; offline data build)"
 BATCH = 150
 PAUSE = 0.4  # seconds between requests, to be polite to the public endpoint
 

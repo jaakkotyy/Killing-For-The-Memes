@@ -3,7 +3,7 @@ extends Control
 ## Hands off to Session; App switches to the lobby once we are in.
 
 const _ERROR_COLOR: Color = Color(0.95, 0.4, 0.35)
-const _INFO_COLOR: Color = Color(0.75, 0.7, 0.62)
+const _INFO_COLOR: Color = Color(0.7, 0.78, 0.9)
 
 @onready var _name_edit: LineEdit = %NameEdit
 @onready var _host_button: Button = %HostButton
@@ -36,7 +36,7 @@ func _on_host_pressed() -> void:
 	var player_name: String = _commit_name()
 	Settings.host_port = int(_port_spin.value)
 	Settings.save_settings()
-	_set_busy("Opening the room on port %d..." % Settings.host_port)
+	_set_busy("Opening the airlock on port %d..." % Settings.host_port)
 	Session.host_game(player_name, Settings.host_port)
 
 

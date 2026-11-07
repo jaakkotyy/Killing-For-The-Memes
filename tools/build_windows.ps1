@@ -8,7 +8,7 @@ param([switch]$Debug)
 
 $OutDir = Join-Path $ProjectRoot "builds\windows"
 New-Item -ItemType Directory -Force $OutDir | Out-Null
-$OutFile = Join-Path $OutDir "KillingForTheMemes.exe"
+$OutFile = Join-Path $OutDir "Adrift.exe"
 
 & $Godot --headless --path $ProjectRoot --import | Out-Null
 

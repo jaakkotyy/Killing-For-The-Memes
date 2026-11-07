@@ -1,12 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- Original placeholder icon: a grinning CRT monitor. -->
-  <rect width="128" height="128" rx="16" fill="#1a1414"/>
-  <rect x="14" y="20" width="100" height="78" rx="12" fill="#5b5247"/>
-  <rect x="24" y="29" width="80" height="58" rx="8" fill="#0f2a1e"/>
-  <circle cx="48" cy="50" r="6" fill="#7dff9e"/>
-  <circle cx="80" cy="50" r="6" fill="#7dff9e"/>
-  <path d="M38 66 Q64 86 90 66" stroke="#7dff9e" stroke-width="5" fill="none" stroke-linecap="round"/>
-  <rect x="50" y="98" width="28" height="10" fill="#5b5247"/>
-  <rect x="36" y="106" width="56" height="8" rx="3" fill="#5b5247"/>
-  <path d="M70 20 L76 10 L80 20" fill="#8b1d1d"/>
+  <!-- Original icon: a red planet and its moon adrift in space, with a question mark. -->
+  <defs>
+    <radialGradient id="planet" cx="0.38" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#d0563f"/>
+      <stop offset="0.65" stop-color="#7a1f1c"/>
+      <stop offset="1" stop-color="#2a0909"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" rx="18" fill="#050a16"/>
+  <circle cx="18" cy="22" r="1.6" fill="#cfe6ff"/>
+  <circle cx="104" cy="16" r="1.2" fill="#cfe6ff"/>
+  <circle cx="112" cy="58" r="1.4" fill="#cfe6ff"/>
+  <circle cx="14" cy="96" r="1.2" fill="#cfe6ff"/>
+  <circle cx="58" cy="12" r="1" fill="#cfe6ff"/>
+  <circle cx="54" cy="70" r="40" fill="url(#planet)"/>
+  <path d="M18 58 A40 40 0 0 1 72 34" stroke="#ff8a6a" stroke-width="2.5" fill="none" opacity="0.7"/>
+  <circle cx="102" cy="96" r="12" fill="#c9c3cc"/>
+  <circle cx="98" cy="92" r="3" fill="#a59fae"/>
+  <path d="M42 60 Q42 46 54 46 Q66 46 66 57 Q66 64 58 68 Q54 70 54 77" stroke="#9ff0ff" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <circle cx="54" cy="89" r="4.5" fill="#9ff0ff"/>
 </svg>

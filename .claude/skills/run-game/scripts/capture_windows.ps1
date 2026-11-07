@@ -7,7 +7,7 @@
 param(
     [string]$OutDir = (Join-Path ([System.IO.Path]::GetTempPath()) "kftm_windows"),
     [string]$Prefix = "win",
-    [string]$TitleLike = "Killing for the Memes*"
+    [string]$TitleLike = "Adrift*"
 )
 
 Add-Type -AssemblyName System.Drawing

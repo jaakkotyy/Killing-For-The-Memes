@@ -7,9 +7,9 @@ extends Control
 ## folder" opens it (with an example pack to copy the first time), and the list reloads
 ## when the window gets the focus back.
 
-const _READY_COLOR: Color = Color(0.45, 0.85, 0.45)
-const _WAITING_COLOR: Color = Color(0.65, 0.6, 0.55)
-const _HOST_COLOR: Color = Color(0.95, 0.75, 0.35)
+const _READY_COLOR: Color = Color(0.5, 0.95, 0.75)
+const _WAITING_COLOR: Color = Color(0.55, 0.6, 0.7)
+const _HOST_COLOR: Color = Color(0.7, 0.88, 1.0)
 const _EXAMPLE_PACK: String = "res://data/identity_examples/friends.json"
 
 @onready var _join_info_label: Label = %JoinInfoLabel

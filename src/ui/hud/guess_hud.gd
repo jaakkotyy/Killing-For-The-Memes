@@ -10,11 +10,11 @@ extends CanvasLayer
 
 const BANNER_SECONDS: float = 2.5
 const TOAST_SECONDS: float = 2.2
-const TEXT_COLOR: Color = Color(0.92, 0.88, 0.8)
-const DIM_COLOR: Color = Color(0.62, 0.58, 0.52)
+const TEXT_COLOR: Color = Color(0.86, 0.92, 1.0)
+const DIM_COLOR: Color = Color(0.55, 0.62, 0.72)
 const GOOD_COLOR: Color = Color(0.45, 1.0, 0.62)
 const BAD_COLOR: Color = Color(0.95, 0.3, 0.25)
-const WINNER_COLOR: Color = Color(0.95, 0.8, 0.35)
+const WINNER_COLOR: Color = Color(0.72, 0.94, 1.0)
 
 ## Session, or a stand-in with the same guess_updated signal and methods (GuessPresenter
 ## documents the list).
@@ -413,8 +413,8 @@ func _overlay_label(size: int, height: float) -> Label:
 ## Dark translucent panels, outlined text over the dim room.
 func _build_theme() -> Theme:
 	var panel := StyleBoxFlat.new()
-	panel.bg_color = Color(0.04, 0.03, 0.03, 0.78)
-	panel.border_color = Color(0.4, 0.3, 0.25, 0.8)
+	panel.bg_color = Color(0.02, 0.04, 0.08, 0.78)
+	panel.border_color = Color(0.2, 0.36, 0.52, 0.85)
 	panel.set_border_width_all(2)
 	panel.set_corner_radius_all(6)
 	panel.set_content_margin_all(12)

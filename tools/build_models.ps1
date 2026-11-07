@@ -78,6 +78,13 @@ foreach ($prop in @("cup", "can", "beer")) {
     Invoke-BlenderExport $prop $propArgs (Join-Path $env:TEMP "kftm_build_$prop.log") "WROTE|PROP"
 }
 
+# The two planets around the platform: base colour baked to a texture, rim colour to JSON.
+$planetSource = Join-Path $AssetsDir "planets.blend"
+if (-not (Test-Path $planetSource)) { Write-Error "Source not found: '$planetSource'. Pass -AssetsDir or set `$env:KFTM_ASSETS."; exit 1 }
+$planetArgs = @("-b", "--factory-startup", "`"$planetSource`"", "--python", "`"$(Join-Path $PSScriptRoot 'blender\build_planets.py')`"", "--",
+    "--out", "`"$(Join-Path $ProjectRoot 'assets\models\planets')`"")
+Invoke-BlenderExport "planets" $planetArgs (Join-Path $env:TEMP "kftm_build_planets.log") "WROTE|PLANET"
+
 Write-Host "Re-importing in Godot..."
 & $Godot --headless --path $ProjectRoot --import *> (Join-Path $env:TEMP "kftm_import.log")
 Write-Host "Done. Check the room with: Godot --path . -- --room-preview=8 --room-camera=overview"

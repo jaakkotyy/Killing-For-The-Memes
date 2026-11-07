@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Killing for the Memes"
+config/name="Adrift"
 config/description="A dark-comedy multiplayer meme party game. Worst meme dies."
 config/version="0.1.0"
 run/main_scene="res://src/ui/main_menu/main_menu.tscn"
