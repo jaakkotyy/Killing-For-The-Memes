@@ -1,15 +1,22 @@
-# CLAUDE.md — Killing for the Memes
+# CLAUDE.md — Adrift
 
 Context for AI coding sessions. Keep this file current when architecture or conventions change.
 
 ## What this is
 
-Online multiplayer (3–8 players) dark-comedy party game. Players chained around a table in a
-3D room make memes on in-world CRT monitors (camera zooms into a 2D editor); memes are judged
-on a wall TV with a spotlight; worst meme's author dies a cartoon death; last survivor wins.
+**Adrift**: an online multiplayer (3–8 players) "Who am I?" party game. Players sit
+chained around a table of CRT terminals on a round platform floating in deep space (a red
+planet and its moon, a starfield). Everyone gets a secret identity from a Wikidata-built
+pack that floats on a sign over their head; everyone can read it except its owner. Players
+ask yes/no questions, the others answer, and each searches the identity database on their
+own CRT (the camera zooms into a 2D terminal) and guesses. Points over three rounds;
+nobody dies. Tone: mysterious, a little melancholy, no violence.
 Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default numbers).
-A second mode is planned: "Who Am I?" guessing with a database search terminal
-(`docs/GUESS_MODE.md`, milestones G1–G5).
+
+History: until 2026-11-08 this was "Killing for the Memes", a meme game with guns and
+deaths, with "Who am I?" as a second mode. The meme game was deleted (branch
+`feature/space`); only the guessing game remains. The repo folder and GitHub repo keep the
+old name, and so does the external assets folder.
 
 ## Hard requirements
 
@@ -17,13 +24,10 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 - Online multiplayer, **server-authoritative** (the hosting player is the server).
 - Must be Steam-ready: Steamworks lobbies, invites, P2P networking and achievements must be
   addable **without touching game logic**. All networking goes through the transport layer.
-- **Everything we ship is original.** Nothing from Saw or other copyrighted media. Only assets
-  whose license allows commercial use; every third-party asset goes in `CREDITS.md` in the same commit.
-  The one exception is opt-out and never shipped: popular meme templates fetched at run time
-  from Imgflip, memes from Reddit (via meme-api.com) and GIF templates from GIPHY (`src/meme/online/`). They are other people's
-  copyrighted images; their use must be cleared (or the source swapped for a licensed one)
-  before a commercial release. Never commit an API key: the GIPHY key lives in the
-  `GIPHY_API_KEY` environment variable or the user's `settings.cfg`.
+- **Everything we ship is original** or properly licensed, and every third-party asset
+  goes in `CREDITS.md` in the same commit. The game is for friends, not for sale, but
+  don't recreate a specific existing game. Portraits are fetched at run time from
+  Wikimedia Commons and never shipped.
 
 ## Stack
 
@@ -39,40 +43,42 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 ```powershell
 .\tools\run_tests.ps1                # import + run all unit tests headless
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
-.\tools\smoke_test.ps1 -Clients 3 -FullGame   # ...and bots play a whole match to GAME_OVER
-.\tools\smoke_test.ps1 -FullGame -Online      # same, with popular templates from Imgflip (needs internet)
-.\tools\smoke_test.ps1 -FullGame -Mode guess  # bots play a whole guess-mode game (-Pack movies)
+.\tools\smoke_test.ps1 -Clients 3 -FullGame [-Pack movies]   # ...and bots play a whole game to GAME_OVER
+.\tools\smoke_test.ps1 -FullGame -Online      # same, with portraits from Commons (needs internet)
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\run_local.ps1 -Bots -FastRounds      # play the host against bot clients
-.\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
+.\tools\build_windows.ps1 [-Debug]   # export builds/windows/Adrift.exe
 .\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
-.\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
-.\tools\build_identities.ps1         # rebuild guess mode's identity packs from Wikidata (Python, internet)
+.\tools\build_identities.ps1         # rebuild the identity packs from Wikidata (Python, internet)
 python tools/make_music.py           # re-render the background music loop (assets/music/)
 ```
 
-To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
-(`editor` starts zoomed into your CRT's meme editor). Add `--mode=guess [--pack=<id>]`
-for a local guess game with the search terminal and placards.
-To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
+PowerShell's execution policy blocks the scripts here; run them as
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\<script>.ps1`.
 
-Run `run_tests.ps1` before every commit and `smoke_test.ps1` (lobby, `-FullGame`, and
-`-FullGame -Mode guess`) before merging networking changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
-`src/util/launch_options.gd` and the README.
+To look at the platform without networking: `--room-preview=<n> [--pack=<id>]
+[--room-camera=seat|tv|overview|editor]` (a local game against fake players; `editor`
+starts zoomed into your terminal).
+
+Run `run_tests.ps1` before every commit and `smoke_test.ps1` (lobby and `-FullGame`)
+before merging networking changes. Developer launch flags (`--host`, `--join=`,
+`--auto-ready`, …) are documented in `src/util/launch_options.gd` and the README.
+After adding a new asset (WAV, PNG, glb), run the tests twice: the first import pass can
+report a spurious parse error.
 
 Godot headless output can be very large; when running it from PowerShell, redirect to a
 file (`*> file.log`) and search the file instead of piping straight into `Select-String`.
 
 To run, drive or screenshot the actual game (headless scenarios, windowed instances, window
-captures), use the project skill `.claude/skills/run-game/`. Update it whenever a milestone
-adds new screens or launch flags.
+captures), use the project skill `.claude/skills/run-game/`. Update it whenever new
+screens or launch flags arrive.
 
 ## Architecture
 
 Layers, with dependencies pointing **downward only**:
 
 ```
-ui/, world/, meme/, guess/ presentation: read Session state, call Session methods, listen to signals
+ui/, world/, guess/       presentation: read Session state, call Session methods, listen to signals
         │
 autoload/App              scene flow (menu → lobby → room) driven by Session signals
 autoload/Session          RPC bridge: the ONLY place with @rpc functions; holds the client mirror
@@ -88,140 +94,103 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - **`src/core/`** — game rules as plain `RefCounted` classes. Deterministic given inputs
   (inject RNG/seed, pass `now` in). Fully unit-tested. Never references `multiplayer`,
   nodes or UI.
-  - `GameMatch`: the round state machine (WAITING → PROMPT → CREATE → SPOTLIGHT×n →
-    ELIMINATION → … → GAME_OVER). The server calls `update(now)` every frame and the intent
-    methods (`submit_meme`, `cast_vote`, `shoot`, `remove_player`), which take untrusted
-    `Variant` input and return an `IntentResult`. `to_snapshot(now, viewer_id)` is the
-    per-player view with hidden information removed; never send anything else to clients.
-  - `Scoring`: score formula and elimination choice. `GameConfig` (Resource): all tunables.
-  - `MemeSpec`, `PlayerState`, `PromptDeck` (packs in `data/prompts/*.json`), `LobbyState`.
-  - `MatchView`: a client's parsed snapshot plus the client-side copies of the vote/shoot
-    rules. The presentation diffs a view against the previous one to find shots, deaths
-    and new spotlights, so the server sends no separate events.
-  - `guess/`: guess mode's database (`docs/GUESS_MODE.md`). `IdentityPack` loads and
-    validates `data/identities/<pack>.json` (typed fields, entries, stock questions),
-    `IdentityFilter` is one condition (an unknown value never crosses an entry out;
-    `negated()` is what a "No" means), `IdentityQuery` is a terminal search (filters,
-    name text, struck-out candidates, fame order), `IdentityDeck` deals distinct
-    identities from the best known `pool_size`. `GuessMatch` is the mode's rules, with
-    GameMatch's contract (`update(now)`, intents `ask`/`answer`/`guess`/`remove_player`
-    returning `GameMatch.IntentResult`, `to_snapshot(now, viewer)` that never contains
-    the viewer's own unsolved identity; snapshots carry `"mode": "guess"`). Phase timers
-    plus a round clock; points, no deaths. `GuessView` is the client's parsed snapshot.
-    The host picks the mode (`GameMode`) and pack in the lobby (`LobbyState.mode`/`pack`,
-    `ServerController.handle_set_mode`); ServerController then runs `guess_match` instead
-    of `game_match`, Session routes `ask_question`/`ask_stock_question`/`answer_question`/
-    `guess_identity` and emits `guess_updated(GuessView, previous)` (`Session.guess_view`).
-    Every client loads the pack from its own files (`IdentityPack.load_pack`, cached).
-    Shipped packs: musicians, movies, actors, history, game_characters. Custom packs
-    (`user://identities/<id>.json`, host only; example in `data/identity_examples/`) travel
-    as `pack_text` in `_rpc_game_started` (protocol 8) and clients validate them with
-    `IdentityPack.receive()`; `forget_received()` on leaving. `Portrait.url_for()` rebuilds
-    a Commons thumbnail URL from an entry's `image`; the terminal and placards show it via
-    `TemplateImageCache` when `App.online_images_allowed()`. Wikimedia answers 429 unless the
-    User-Agent (`HttpText.USER_AGENT`) carries a contact, which is the public repo URL.
-    `util/guess_auto_player.gd` is the guess bot (asks stock questions, answers them
-    truthfully, filters, guesses).
-    In the room (`GameRoom.is_guess_mode()`), `world/room/GuessPresenter` and
-    `ui/hud/GuessHud` replace MatchPresenter/MatchHud, and the CRT runs a
-    `SearchStation` (`guess/terminal/SearchTerminal`: filters, clue log, ask pane, answer
-    bar, results with crossing out, GUESS). `CrtStation` is the shared base of
-    `MemeStation` and `SearchStation`; `ui/crt/CrtTheme` the shared phosphor look.
-    `IdentityPlacard` hangs over each head (`Seat.show_placard`). Both read a duck-typed
-    `source` (Session, or `PreviewGuessGame` for `--room-preview --mode=guess`).
-    Tests: `test_guess_match.gd`, `test_guess_simulation.gd`, `test_custom_packs.gd`,
-    `test_portrait.gd`, `test_guess_room.gd`.
-  - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
-    seeded random full games with invariant checks. Add both kinds for new rules.
+  - `guess/GuessMatch`: the round state machine (WAITING → DEAL → (ASK → ANSWER →
+    RESULT)×n → REVEAL → … → GAME_OVER), phase timers plus a round clock, points. The
+    server calls `update(now)` every frame and the intent methods (`ask`, `answer`,
+    `guess`, `remove_player`), which take untrusted `Variant` input and return an
+    `Intent.Result` (`core/intent.gd`). `to_snapshot(now, viewer_id)` is the per-player
+    view; it never contains the viewer's own unsolved identity. Never send anything else
+    to clients. `GuessMatch.sanitize_question()` cleans typed questions.
+  - `guess/GuessView`: a client's parsed snapshot plus client-side copies of the rules
+    (`can_ask`, …). The presentation diffs a view against the previous one to find new
+    questions, answers, solves and reveals, so the server sends no separate events.
+  - `guess/IdentityPack` loads and validates `data/identities/<pack>.json` (typed fields,
+    entries, stock questions); `IdentityFilter` is one condition (an unknown value never
+    crosses an entry out; `negated()` is what a "No" means); `IdentityQuery` is a terminal
+    search (filters, name text, struck-out candidates, fame order); `IdentityDeck` deals
+    distinct identities from the best known `deal_pool`. `Portrait.url_for()` rebuilds a
+    Commons thumbnail URL from an entry's `image`.
+  - Shipped packs: musicians (default), movies, actors, history, game_characters. Custom
+    packs (`user://identities/<id>.json`, host only; example in `data/identity_examples/`)
+    travel as `pack_text` in `_rpc_game_started` and clients validate them with
+    `IdentityPack.receive()`; `forget_received()` on leaving. Every client loads shipped
+    packs from its own files (`IdentityPack.load_pack`, cached).
+  - `PlayerState` (PLAYING/LEFT, score), `LobbyState` (players, ready, the host's `pack`),
+    `GameConfig` (Resource): all tunables.
+  - Test style: `tests/unit/test_guess_match.gd` for rules, `test_guess_simulation.gd`
+    for seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`
   (stub) later. A transport only creates a Godot `MultiplayerPeer` (reported through the
   `peer_ready`/`failed` signals, because Steam lobby creation is async) and reports join info.
   RPC code never knows which transport is active; `Net.set_transport()` swaps it.
   - `ServerController` (host only) owns the authoritative state, validates every intent
     (RPC arguments arrive as `Variant` and are type-checked), and emits signals saying what
-    to broadcast. It never touches the network, so it is unit-tested directly.
-    It owns the `GameMatch`: Session calls `update(now)` and `flush()` every frame, and any
-    change (phase, intent, player leaving) emits one `match_changed` per frame, on which
-    Session sends every player their own `snapshot_for(id, now)`.
+    to broadcast. It never touches the network, so it is unit-tested directly. It owns the
+    `guess_match`: Session calls `update(now)` and `flush()` every frame, and any change
+    (phase, intent, player leaving) emits one `match_changed` per frame, on which Session
+    sends every player their own `snapshot_for(id, now)`. `handle_set_pack` is host-only
+    and lobby-only.
   - `Session` autoload is the RPC bridge on every peer: client→server intents via
     `rpc_id(1, …)`, server→client snapshots via `rpc_id(peer, …)`. The host calls
     `ServerController` directly instead of sending RPCs to itself. Clients keep a read-only
-    mirror (`Session.lobby`, `Session.match_view`) rebuilt from snapshots, and the UI only
-    reads that mirror (`Session.match_updated(view, previous)`). Clients count `time_left`
-    down locally; the editor auto-submits `auto_submit_lead` seconds before the deadline.
-  - Clients send **intents** only (`request_join`, `set_ready`, `submit_meme`,
-    `cast_vote`, `shoot`, the host's `return_to_lobby`), never state. `server_relay` is off: clients never talk to each other.
+    mirror (`Session.lobby`, `Session.guess_view`) rebuilt from snapshots and emit
+    `guess_updated(view, previous)`. Clients count `time_left` down locally.
+  - Clients send **intents** only (`request_join`, `set_ready`, `set_pack` (host),
+    `ask_question`, `ask_stock_question`, `answer_question`, `guess_identity`, the host's
+    `return_to_lobby`), never state. `server_relay` is off: clients never talk to each other.
   - All RPC method names and payload shapes are listed in `src/net/protocol.gd`. Bump
-    `Protocol.VERSION` when any of them change.
+    `Protocol.VERSION` (now 9) when any of them change.
   - `JoinCode` turns IPv4 + port into a 10-character code (Crockford base32). It is a
     convenience only, not a matchmaking service.
 - **`src/platform/`** — `PlatformService` (achievements, friend names, invites, rich presence)
   with `NullPlatform` now, `SteamPlatform` later.
-- **`src/meme/`** — memes travel over the network as a small `MemeSpec` dictionary
-  (template id + captions), never as images. Every client renders them locally with
-  `MemeRenderer` (template + outlined captions that shrink to fit). `MemeTemplateLibrary`
-  reads `data/meme_templates.json`; its `ids()` are what the server allows. Template images
-  (`assets/meme_templates/<id>.jpg`) are original: staged shots of our own room, rendered by
-  `tools/capture_templates.ps1` (`templates/template_studio.gd`, one `_shot_<id>()` each).
-  `online/`: online templates. On the host, `OnlineTemplateSource` fetches Imgflip's top
-  stills and, with a GIPHY key (`Settings.get_giphy_api_key()`), reaction GIFs from GIPHY
-  while people join (plus random Imgflip template pages and subreddit memes from meme-api.com,
-  `RedditCatalogue`, shuffled); each provider falls back to its part of the catalogue saved last time.
-  Every online id names its image file (`imgflip-<file>[-png]`, `giphy-<id>`,
-  `reddit-<file>-<ext>`), so `TemplateCatalogue.resolve(id)` draws any valid id and the
-  server accepts any of them (`MemeTemplateLibrary.accepts`, `GameMatch.template_accepts`).
-  `TemplateSearch` (host, App) answers players' editor searches (`Session.search_templates`,
-  Imgflip + GIPHY, or `r/<subreddit>`); results join the library with `add_found()`.
-  `HttpText` runs the host's GETs in parallel.
-  App puts it in the library and `Session.set_template_catalogue()`, and
-  `_rpc_game_started` sends it to everyone. `TemplateCatalogue` validates it on both ends,
-  per provider: `ImgflipCatalogue`, `GiphyCatalogue` and `RedditCatalogue`, all with URLs
-  rebuilt from the id, never taken from data. `TemplateImageCache` downloads each file
-  once per machine into `user://template_cache/`, decoding on worker threads: stills stay in
-  memory, whole GIFs (`AnimatedTemplate`, the last 4) only while needed. `GifDecoder` is
-  our own GIF87a/89a decoder (Godot has none), tested pixel-for-pixel against Pillow with
-  `tests/fixtures/gif/` (regenerate with `make_fixtures.py`). The library's
-  `image_updated` signal tells the renderer and editor when an image arrives. Online ids
-  come first in `ids()`; GIF templates show their still in the list and play in the
-  preview and on the TV. `MemeRenderer` letterboxes any aspect inside the 4:3 frame,
-  captions on the image. Off with `Settings.online_templates` or `--offline-templates`.
-  `editor/MemeEditor` (800x600) edits a local draft, emits `submitted`, and auto-submits
-  the draft when its countdown hits zero.
-- **`src/world/`** — 3D room. `room/room.gd` builds the greybox room in code and places one
-  `Seat` per player with `SeatLayout` (an arc that leaves the TV side open for the host).
-  A seat holds the chair, a drink (the artist's props from `assets/models/props/`, picked by
-  `Seat.drink_index`), `PlayerAvatar` (the artist's model from `assets/models/player/`,
-  tinted per seat by vertex-colour clothing masks, wearing the artist's hat on its Head bone), keyboard, `CrtMonitor` and
-  `WristChain`s. An avatar rests either relaxed (one of the artist's Meshy idles per seat,
-  with an occasional sip) or typing (`type_on_keyboard()`, during CREATE). Your own body
-  always types while the camera is in its head, so a leaning idle never leaves the camera
-  inside your skull. The winner `celebrate()`s (stands up and waves). `CameraRig` glides between seat, TV and overview poses with mouse drift.
-  Chair, table and camera sizes come from `player_metrics.json` written by the Blender
-  export, never from hand-tuned numbers. The room only reads Session state.
-  `room/MatchPresenter` drives it from `MatchView`s: TV captions and memes, spotlight,
-  camera views, the editor's lock and timer, muzzle flashes
-  (`Seat.flash_shot`) and deaths (`PlayerAvatar.die`: puff, slump over the keyboard).
-  `MemeStation` (local seat only, a `CrtStation`) puts the `MemeEditor` in a `SubViewport`
-  that is the picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
-  `FILL` of the view, then shows the same texture fullscreen through `crt_overlay.gdshader`
-  and forwards input (`push_input`, mouse mapped through `CrtMonitor.curve_uv`, the same
-  barrel curve as both shaders, so nothing jumps). Escape reverses it. The wall TV's
-  picture is a `SubViewport` too (`WallTv.show_meme()` / `show_caption()`).
-- **`src/ui/`** — main menu, lobby, and `hud/MatchHud` in the room: round, phase, timer,
-  bullets, vote/shoot buttons (keys 1, 2, Space), shot toasts, results and the win screen
-  (the host's *Play again* returns everyone to the lobby).
-- **`src/util/`** — `LaunchOptions` and `AutoPlayer`, the `--auto-play` bot used by the
-  full-game smoke test (random template, random votes, sometimes shoots).
-- **`src/audio/`** — `Music`: the background loop (`assets/music/forgotten_rooms.wav`, a
-  slow, melancholy, mysterious track with little bass, composed in code by
-  `tools/make_music.py`, so it is ours).
-  App owns the player, so it plays from the menu on through every scene; volume is
-  `Settings.music_volume` (0 = off). No music when headless or with `--no-music`
-  (`run_local.ps1` gives that to the client windows). There are no sound effects.
-- **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
-  sharing a base class, registered with the server so it can validate their intents.
-- **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).
-  No game rules in autoloads.
+- **`src/guess/`** — `terminal/SearchTerminal` (800x600 Control on the CRT): FILTERS /
+  CLUES / ASK panes, results with crossing out, an answer bar, GUESS; it emits
+  `ask_requested`, `stock_requested`, `answer_requested`, `guess_requested`.
+  `portraits/PortraitCache` downloads each Commons thumbnail once per machine into
+  `user://portrait_cache/` (retries 429/503, `static var offline` for tests). Wikimedia
+  answers 429 unless the User-Agent (`PortraitCache.USER_AGENT`) carries a contact, which
+  is the public repo URL. Portraits show only when `App.online_images_allowed()`.
+- **`src/world/`** — the 3D scene.
+  - `space/SpaceBackdrop`: the starfield sky (`space_sky.gdshader`, own procedural
+    stars and nebula), a directional sun, and the artist's planets from
+    `assets/models/planets/` (baked albedo + `planet.gdshader` fresnel rim lit on the sun
+    side; rim colours from `planets.json`), turning slowly. `SpaceBackdrop.environment()`
+    is the shared Environment. `space/SpaceView` is the drifting camera + backdrop behind
+    the title screen and the lobby (a Node3D under their Control root).
+  - `room/room.gd` (`GameRoom`) builds the platform in code (deck, glowing seams and edge
+    ring, tapered underside, a hovering orb light over the table), adds the backdrop with
+    its own WorldEnvironment (SSAO on top), and places one `Seat` per player with
+    `SeatLayout` (an arc that leaves the screen side open). A seat holds the chair, a
+    drink (the artist's props, `Seat.drink_index`), `PlayerAvatar` (the artist's model,
+    tinted per seat by vertex-colour clothing masks, wearing the artist's hat), keyboard,
+    `CrtMonitor`, `WristChain`s and the floating `IdentityPlacard` (`Seat.show_placard`).
+    Avatars rest relaxed (Meshy idles, occasional sip) or type; solvers and winners
+    `celebrate()`, wrong guessers `flinch()`. Your own body always types while the camera
+    is in its head. Chair, table and camera sizes come from `player_metrics.json`.
+  - `room/GuessPresenter` drives the room from `GuessView`s (screen captions, spotlight
+    on the asker, camera, placards, the terminal); it reads a duck-typed `source`
+    (Session, or `PreviewGuessGame` for `--room-preview`). `ui/hud/GuessHud` is the overlay.
+  - `wall_tv/WallTv`: the floating screen on a pylon (`show_caption()`), its picture a
+    `SubViewport` through the CRT shader.
+  - `room/CrtStation` → `SearchStation` puts the terminal in a `SubViewport` that is the
+    picture on the local player's CRT. `crt/CrtZoom` glides the camera until the screen
+    fills `FILL` of the view, then shows the same texture fullscreen through
+    `crt_overlay.gdshader` and forwards input (`push_input`, mouse mapped through
+    `CrtMonitor.curve_uv`, the same barrel curve as both shaders). Escape reverses it.
+  - `CameraRig` glides between seat, screen and overview poses with mouse drift.
+- **`src/ui/`** — title screen (`main_menu`: "ADRIFT" / "Who am I?" over a SpaceView),
+  lobby (pack picker, *Your packs folder*), `hud/GuessHud`, `crt/CrtTheme` (the phosphor
+  look), `theme/main_theme.tres` (deep blue panels, starlight text).
+- **`src/util/`** — `LaunchOptions` and `guess_auto_player.gd`, the `--auto-play` bot
+  (asks stock questions, answers them truthfully, filters, guesses).
+- **`src/audio/`** — `Music`: the background loop (`assets/music/forgotten_rooms.wav`,
+  slow, melancholy and mysterious, composed in code by `tools/make_music.py`). App owns
+  the player; volume is `Settings.music_volume` (0 = off). No music when headless or with
+  `--no-music`. There are no sound effects.
+- **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins.
+- **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`,
+  `App`). No game rules in autoloads.
 
 ## Conventions
 
@@ -233,40 +202,33 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
 - Scenes own their script in the same folder (`foo.tscn` + `foo.gd`).
 - Use `%UniqueName` node access instead of long `$Path/To/Node` chains.
 - Communicate upward with signals, downward with method calls. No `get_parent()` reaching.
-- Tunable numbers (timers, points, bullets) live in the game config resource, not literals.
+- Tunable numbers (timers, points) live in the game config resource, not literals.
 - All user-facing strings go through `tr()`-ready text (English only for now).
 - Commit `.uid` files generated by Godot alongside their scripts.
 - Never commit `.godot/`, `builds/`, or credentials.
 
 ## Git workflow
 
-- `main` is always runnable. One feature branch per milestone/feature (`feature/m1-networking`).
+- `main` is always runnable. One feature branch per milestone/feature (`feature/space`).
 - Small, logical commits with imperative messages (`Add ENet transport`), then merge to `main`.
 - Add/update unit tests with every `core/` change; run `tools/run_tests.ps1` before committing.
 
 ## Milestones
 
-- [x] **M0** Project setup: Godot project, docs, GUT, Windows export preset
-- [x] **M1** Networking skeleton: main menu, host/join (IP or code), lobby with names, ready-up,
-  join rejection (version/full/started/timeout), local multi-instance + smoke test scripts.
-- [x] **M2** Core rules (pure, unit-tested): state machine, scoring, bullets, elimination, win,
-  disconnects, per-player snapshots, default prompt pack.
-- [x] **M3** 3D greybox room: auto-placed seats, wall TV, host placeholder, lighting, camera rig,
-  the artist's player model rigged/animated via `tools/build_models.ps1`, `--room-preview`.
-- [x] **M4** Meme editor + CRT zoom transition: 8 original templates from our own room, editor
-  with live preview and auto-submit, zoom with input hand-off.
-- [x] **M5** Full round loop wired end to end: per-player snapshots (protocol v2), HUD with
-  voting/shooting, presenter choreography, deaths, win screen, play again, bot players and
-  a full-game smoke test.
-- [ ] **M6** Hardening (disconnects, timeouts), SFX, Windows build, playtest
-- Post-MVP: Steam (GodotSteam), ghosts, activities, HP mode, GIFs, prompt packs, Linux/macOS
+- [x] Project setup, networking skeleton (host/join by IP or code, lobby, ready-up,
+  rejections, local multi-instance + smoke tests), the 3D table with the artist's rigged
+  character, CRT zoom with input hand-off.
+- [x] G1–G4: identity packs, GuessMatch rules, network wiring, the terminal, placards, HUD.
+- [x] G5 polish: portraits, five packs, custom packs, background music.
+- [x] Space: the meme game removed, the platform in space, title screen and lobby, the
+  name Adrift (2026-11-08).
+- [ ] Hardening (disconnects, timeouts), sound effects, Windows build, playtest and tuning.
+- Later: Steam (GodotSteam), more packs, Linux/macOS.
 
 ## Decisions log
 
 - Godot 4 + typed GDScript over C# (GodotSteam is GDScript-first; simpler exports).
 - Join "code" before Steam = encoded IP:port. Real codes/NAT traversal arrive with Steam relay.
-- Meme font: an OFL Impact-alike (e.g. Anton) — Impact itself is not redistributable.
-- Eliminated players spectate and can still vote in the MVP (prevents final 1v1 deadlock).
 - Code is proprietary (all rights reserved); no open-source license.
 - No Git LFS until binary assets grow large.
 - Do NOT use `MultiplayerPeer.refuse_new_connections` to lock a started game: ENet lets the
@@ -279,39 +241,30 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   instead of assigning directly, which fails at runtime.
 - Character pipeline: our Blender files are the source; a headless Blender script bakes,
   rigs (21 bones from measured landmarks, automatic weights), animates and exports `.glb`.
-  Big `.blend` files stay out of git (GitHub's 100 MB limit). Poses are keyed in Blender,
-  not built procedurally in Godot, so they can be previewed in Cycles renders.
-- Clothing is a vertex-colour mask on the one body mesh, tinted per player in a shader,
-  instead of separate clothing meshes: one draw call per player and no clipping.
-- Meme templates are rendered from our own 3D room (players in poses, the room), not
-  downloaded images: always original, always on-style, and re-renderable when the art changes.
+  Big `.blend` files stay out of git (GitHub's 100 MB limit). Poses are keyed in Blender.
+- Clothing is a vertex-colour mask on the one body mesh, tinted per player in a shader.
+- The artist's Meshy animations (Mixamo rig) are retargeted onto our own rig in Blender
+  (`tools/blender/retarget_mixamo.py`) and pushed out of our table at build time.
+- Accessories (the hat) are fitted to the body in Blender and exported in the player's
+  rest-pose model space; Godot only attaches them to a bone. The local player's own hat
+  is shadow-only in first person.
 - The zoom hand-off forwards input with `SubViewport.push_input()` instead of reparenting
   into a `SubViewportContainer`, so the CRT keeps showing the same viewport throughout. A
   container-less SubViewport ignores the mouse until it gets `NOTIFICATION_VP_MOUSE_ENTER`.
+  A Control filling a SubViewport sets its `size` (anchors top-left), not full-rect anchors,
+  or Godot warns about non-equal opposite anchors.
 - Push test input to the root with `push_input(event, true)`: positions must already be in
   the stretched root-viewport space that `_input()` sees (the headless window is tiny).
-- Popular templates are fetched at run time, not bundled: the images aren't ours to ship,
-  and a runtime source can be switched off or swapped for a licensed one without touching
-  game logic. Clients download them straight from the image host (memes still travel as
-  ids + captions), and validate the host's catalogue so it can only point at Imgflip
-  and GIPHY.
-- GIFs are decoded by our own GDScript `GifDecoder` on worker threads (a 40-frame 200 px
-  GIF takes about 0.4 s): Godot can't load GIFs, and GIPHY's MP4/WebP renditions would
-  need video or animated-WebP support Godot doesn't have either.
-- The artist's Meshy animations (Mixamo rig) are retargeted onto our own rig in Blender
-  (`tools/blender/retarget_mixamo.py`, world rotations relative to the rest pose). We don't
-  swap in Meshy's rig and mesh: that keeps the hat bone, clothing masks, metrics and the
-  20k-triangle body. The clips are pushed out of our table at build time (less torso lean,
-  arms turned at the shoulder), because they were made for a chair without a table.
-- Accessories (the hat) are fitted to the body in Blender and exported in the player's
-  rest-pose model space; Godot only attaches them to a bone. Refitting never needs
-  hand-tuned offsets in Godot. The local player's own hat is shadow-only in first person.
 - Match state reaches clients only as full per-player snapshots, never as events. Effects
-  (shots, deaths, new spotlights) come from diffing two views, so a late or reconnecting
-  client just shows the current state, and a lost snapshot is healed by the next one.
-- No host character: the hosting player runs the show. The spotlight is host-paced by
-  default (`GameConfig.host_paces_spotlight`): it has no timer (snapshot `time_left` -1,
-  `MatchView.timed` false) and ends on `GameMatch.present_next(from_index)`, which only
-  the host can send. `from_index` makes a double press harmless. Host-only actions need
-  no RPC, because the host runs the server. Bot hosts (`--auto-play`) present after
-  `spotlight_duration`, so automated full games still finish.
+  come from diffing two views, so a late or reconnecting client just shows the current
+  state, and a lost snapshot is healed by the next one.
+- No host character: the hosting player runs the show.
+- You can't see your own identity; everyone else can. Questions are always answered by
+  players, never by the server. The terminal searches the pack locally.
+- Planets: their procedural Blender materials can't go through glTF, so
+  `build_planets.py` bakes the base colour (routed into an Emission shader, baked as EMIT)
+  and a Godot shader adds the rim glow. Only `planets.blend` is used from the space
+  assets (not the spaceship or sci-fi files).
+- 2026-11-08: the meme game was removed rather than hidden, so nothing meme-related is
+  left to maintain. Renaming `config/name` to "Adrift" moved `user://` to
+  `%APPDATA%\Godot\app_userdata\Adrift\` (settings and custom packs start fresh).

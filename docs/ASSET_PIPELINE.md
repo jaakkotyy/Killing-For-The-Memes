@@ -1,14 +1,14 @@
 # Asset pipeline: Blender models → Godot
 
-The character models are made in Blender. The source `.blend` files are big (the player
-file is ~370 MB because of the high-poly sculpt), so they live **outside the repo** in
+The character, prop and planet models are made in Blender. The source `.blend` files
+are big (the player file is ~370 MB because of the high-poly sculpt), so they live **outside the repo** in
 `D:\Killing-For-The-Memes-Assets\` (override with `-AssetsDir` or `$env:KFTM_ASSETS`). Back
 that folder up separately. Only the exported, game-ready files are committed.
 
 ```powershell
 .\tools\build_models.ps1             # bake + rig + export (about 1 minute)
 .\tools\build_models.ps1 -SkipBake   # keep the committed normal/AO maps
-.\tools\build_models.ps1 -PropsOnly  # skip the player: hat and table props (a few seconds)
+.\tools\build_models.ps1 -PropsOnly  # skip the player: hat, table props and planets
 ```
 
 Requires Blender 2.81 or newer (`-Blender` or `$env:BLENDER`, default `D:\Blender\blender.exe`).
@@ -117,11 +117,26 @@ the beer's bubble particles are dropped). For each prop it:
 `Seat` puts one drink to the right of each keyboard, chosen by seat (`Seat.drink_index`),
 so every client sees the same table.
 
-## Not yet in the pipeline
+## Planets (`planets.blend` -> `assets/models/planets/`)
 
-- `Skull - DeathScene.blend` (1.5 M-triangle skull with a smoke simulation): needs
-  decimating and baking; the smoke becomes Godot particles. Planned with the death scenes.
-- `Human Eyes.blend`: its iris/sclera textures are missing from the asset folder.
+`tools/blender/build_planets.py` exports the two planets that hang in the sky around the
+platform (`PLANETS` in the script: `Sphere` with material "planeetta" -> `planet_red`,
+`Sphere.001` with "planeetta 2" -> `planet_moon`). Their colour is a procedural node tree
+that glTF can't carry, so for each planet it:
+
+1. Bakes the base colour to `<name>_albedo.png` (2048 px for the red planet, 1024 for the
+   moon) by routing the colour node into an Emission shader and baking EMIT in Cycles.
+2. Reads the source material's rim emission colour into `planets.json` (`rim`).
+3. Scales the mesh to a 1 m radius around its centre and exports `<name>.glb`.
+
+`world/space/SpaceBackdrop` scales them to their size in the sky and draws them with
+`planet.gdshader`: the baked albedo plus a fresnel rim from `planets.json`, lit only on
+the side that faces the sun. The other files in the assets folder (spaceship, sci-fi
+props) are not used.
+
+## Not in the pipeline
+
+- `Skull - DeathScene.blend` and `Human Eyes.blend`: not used (Adrift has no deaths).
 
 ## Pitfalls
 

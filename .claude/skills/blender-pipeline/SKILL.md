@@ -1,9 +1,9 @@
 ---
 name: blender-pipeline
-description: Turn the user's own Blender character files (D:\Killing-For-The-Memes-Assets) into game-ready Godot assets for Killing for the Memes - inspect and preview .blend files headless, bake normal/AO maps from a sculpt, rig with automatic weights, key seated/flinch poses, export .glb and verify in the 3D room. Use when asked to use, change, re-export, rig, animate or check a character, skull, hat or other model from Blender, or when the models look wrong in game.
+description: Turn the user's own Blender files (D:\Killing-For-The-Memes-Assets) into game-ready Godot assets for Adrift - inspect and preview .blend files headless, bake normal/AO maps from a sculpt, rig with automatic weights, key seated/flinch poses, bake the planets' procedural colour, export .glb and verify on the platform. Use when asked to use, change, re-export, rig, animate or check a character, hat, prop, planet or other model from Blender, or when the models look wrong in game.
 ---
 
-# Blender characters → Godot
+# Blender models → Godot
 
 The user makes the models in Blender. The sources stay **outside the repo** in
 `D:\Killing-For-The-Memes-Assets\` (hundreds of MB; GitHub rejects files over 100 MB).
@@ -23,6 +23,13 @@ user's .blend files**; scripts change data in memory and only export.
 
 It prints `SKIN groups=21 unweighted_verts=0 / 9974`, the seat calibration and one
 `WROTE` per output (`player.glb`, `player_metrics.json`, maps). Then it re-imports in Godot.
+
+It also rebuilds the hat, the table props and the planets (`planets.blend` →
+`tools/blender/build_planets.py` → `assets/models/planets/`: `planet_red.glb`,
+`planet_moon.glb`, their baked `*_albedo.png` and `planets.json` with the rim colours;
+it prints `PLANET <name> ...`). Check the planets on the title screen (mode 4 of the
+`run-game` skill without flags): a red marbled planet left of the title, a grey moon lit
+from the right.
 
 ## Verify (always, with your eyes)
 
