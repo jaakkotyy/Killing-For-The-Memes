@@ -8,6 +8,8 @@ Online multiplayer (3–8 players) dark-comedy party game. Players chained aroun
 3D room make memes on in-world CRT monitors (camera zooms into a 2D editor); memes are judged
 on a wall TV with a spotlight; worst meme's author dies a cartoon death; last survivor wins.
 Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default numbers).
+A second mode is planned: "Who Am I?" guessing with a database search terminal
+(`docs/GUESS_MODE.md`, milestones G1–G5).
 
 ## Hard requirements
 
