@@ -87,7 +87,7 @@ them) or turn portraits off.
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| Guess mode sound effects (question, answers, your turn, solved, wrong, reveal, win, deal) | Generated for this project | Original work, all rights reserved | Synthesised from sine/square/saw waves and noise by `tools/make_sfx.py` (standard library only) | `assets/sfx/*.wav` |
+| Background music "Forgotten Rooms" (melancholy half-time loop, 120 BPM, 112 s) | Composed for this project | Original work, all rights reserved | Synthesised (detuned pads, music box, slow arpeggio, soft drums from noise and sine sweeps, quiet sub, reversed swells, crackle, reverb) by `tools/make_music.py`, standard library only | `assets/music/forgotten_rooms.wav` |
 
 ## Original work
 

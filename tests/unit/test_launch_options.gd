@@ -65,3 +65,8 @@ func test_plain_smoke_test_only_waits_for_the_start() -> void:
 func test_offline_templates_flag() -> void:
 	assert_false(LaunchOptions.parse(PackedStringArray()).offline_templates)
 	assert_true(LaunchOptions.parse(PackedStringArray(["--offline-templates"])).offline_templates)
+
+
+func test_no_music_flag() -> void:
+	assert_false(LaunchOptions.parse(PackedStringArray()).no_music)
+	assert_true(LaunchOptions.parse(PackedStringArray(["--no-music"])).no_music)

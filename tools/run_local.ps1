@@ -63,7 +63,8 @@ Start-Instance 0 $HostArgs
 Start-Sleep -Milliseconds 1000
 
 for ($i = 1; $i -le $Clients; $i++) {
-    $ClientArgs = @("--join=127.0.0.1:$Port", "--name=Player$i", "--auto-ready")
+    # Only the host window plays music; several copies of the loop out of sync is noise.
+    $ClientArgs = @("--join=127.0.0.1:$Port", "--name=Player$i", "--auto-ready", "--no-music")
     if ($MinPlayers -gt 0) { $ClientArgs += "--min-players=$MinPlayers" }
     if ($Bots) { $ClientArgs += "--auto-play" }
     Start-Instance $i $ClientArgs

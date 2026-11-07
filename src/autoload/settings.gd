@@ -12,8 +12,8 @@ var online_templates: bool = true
 ## Host: your own GIPHY API key, for GIF templates (https://developers.giphy.com). Kept in
 ## user://settings.cfg on this machine only; the GIPHY_API_KEY environment variable wins.
 var giphy_api_key: String = ""
-## Sound effects volume, 0 (off) to 1.
-var sfx_volume: float = 0.8
+## Background music volume, 0 (off) to 1.
+var music_volume: float = 0.6
 
 
 func _ready() -> void:
@@ -29,7 +29,7 @@ func load_settings() -> void:
 	last_join_target = str(config.get_value(_SECTION, "last_join_target", last_join_target))
 	online_templates = bool(config.get_value(_SECTION, "online_templates", online_templates))
 	giphy_api_key = str(config.get_value(_SECTION, "giphy_api_key", giphy_api_key)).strip_edges()
-	sfx_volume = clampf(float(config.get_value(_SECTION, "sfx_volume", sfx_volume)), 0.0, 1.0)
+	music_volume = clampf(float(config.get_value(_SECTION, "music_volume", music_volume)), 0.0, 1.0)
 
 
 ## The key to use for GIPHY ("" = no GIF templates). Never print it.
@@ -44,7 +44,7 @@ func save_settings() -> void:
 	config.set_value(_SECTION, "host_port", host_port)
 	config.set_value(_SECTION, "last_join_target", last_join_target)
 	config.set_value(_SECTION, "online_templates", online_templates)
-	config.set_value(_SECTION, "sfx_volume", sfx_volume)
+	config.set_value(_SECTION, "music_volume", music_volume)
 	if not giphy_api_key.is_empty():
 		config.set_value(_SECTION, "giphy_api_key", giphy_api_key)
 	var err: Error = config.save(_PATH)

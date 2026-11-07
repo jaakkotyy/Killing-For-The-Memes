@@ -64,6 +64,11 @@ func _ready() -> void:
 		guesser.name = "GuessAutoPlayer"
 		add_child(guesser)
 
+	if not options.no_music and DisplayServer.get_name() != "headless":
+		var music := Music.new()
+		music.name = "Music"
+		add_child(music)
+
 	if options.smoke_test:
 		var timeout: float = _SMOKE_TEST_GAME_TIMEOUT if options.smoke_test_full_game else _SMOKE_TEST_TIMEOUT
 		get_tree().create_timer(timeout).timeout.connect(_finish_smoke_test.bind(2, "timed out"))

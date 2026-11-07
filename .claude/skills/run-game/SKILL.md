@@ -94,6 +94,9 @@ The source of truth is `src/util/launch_options.gd`.
 The capture script saves `win0.png` (host, the first one started), `win1.png`, ... using
 `PrintWindow`, so overlapping or off-screen windows are captured too. Read the PNGs.
 Without `-AutoStart`, clients ready up automatically and the host waits for a Start click.
+Only the host window plays the background music (clients get `--no-music`); a window
+that plays it logs `[Music] Playing forgotten_rooms.wav (112 s loop) at <n> dB.`
+Headless instances never play music.
 
 Close the instances you started:
 

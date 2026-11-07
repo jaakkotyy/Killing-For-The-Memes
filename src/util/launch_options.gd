@@ -17,6 +17,7 @@ extends RefCounted
 ##   --fast-rounds        (host) very short phases, for automated full games (debug builds only)
 ##   --seed=<n>           (host) fixed seed for prompts, spotlight order and tie-breaks
 ##   --offline-templates  (host) only our original templates; don't fetch popular ones
+##   --no-music           no background music (local test windows besides the host)
 ##   --mode=<mode>        (host) the lobby's game mode: memes (default) or guess
 ##   --pack=<id>          (host) guess mode's identity pack (data/identities/<id>.json)
 ##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
@@ -39,6 +40,7 @@ var fast_rounds: bool = false
 ## 0 means "random".
 var seed_value: int = 0
 var offline_templates: bool = false
+var no_music: bool = false
 ## "" means "not set" (memes).
 var mode: String = ""
 var pack: String = ""
@@ -85,6 +87,8 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				options.fast_rounds = true
 			"--offline-templates":
 				options.offline_templates = true
+			"--no-music":
+				options.no_music = true
 			"--mode":
 				if GameMode.is_valid(value):
 					options.mode = value

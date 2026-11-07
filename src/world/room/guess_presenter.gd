@@ -3,9 +3,7 @@ extends Node
 ## Guess mode's MatchPresenter: turns GuessViews into what happens in the room. The wall
 ## TV shows the category, the question and its answer; the spotlight follows the asker;
 ## placards show everyone's identity except your own; the CRT runs the SearchTerminal;
-## solvers stand up and wave, wrong guessers flinch, and the winners celebrate. Sound
-## effects (Sfx) mark the deal, your turn, each question, answers and their result,
-## guesses, the reveal and the win.
+## solvers stand up and wave, wrong guessers flinch, and the winners celebrate.
 ##
 ## Like MatchPresenter it only reads views and calls room methods, and works out events by
 ## diffing the new view with the previous one. Views come from [member source]: Session
@@ -21,16 +19,12 @@ var _room: GameRoom
 var _station: SearchStation
 ## Commons portraits on the placards (they come from the internet).
 var _portraits: bool = false
-var _sfx: Sfx
 
 
 func setup(room: GameRoom, p_source: Object = null) -> void:
 	_room = room
 	source = p_source if p_source != null else Session
 	_portraits = App.online_images_allowed()
-	_sfx = Sfx.new()
-	_sfx.name = "Sfx"
-	add_child(_sfx)
 	_station = room.get_search_station()
 	if _station != null:
 		var terminal: SearchTerminal = _station.terminal
@@ -64,7 +58,6 @@ func apply(view: GuessView, previous: GuessView) -> void:
 		_station.terminal.apply_view(view, _local_id())
 	_update_placards(view, pack)
 	_apply_guesses(view, previous)
-	_play_sounds(view, previous, entered)
 	match view.phase:
 		GuessMatch.Phase.DEAL:
 			if entered:
@@ -184,49 +177,6 @@ func _apply_guesses(view: GuessView, previous: GuessView) -> void:
 	for id: int in view.wrong_guesses:
 		if int(view.wrong_guesses[id]) > int(previous.wrong_guesses.get(id, 0)) and _seat(id) != null:
 			_seat(id).avatar.flinch()
-
-
-func get_sfx() -> Sfx:
-	return _sfx
-
-
-func _play_sounds(view: GuessView, previous: GuessView, entered: bool) -> void:
-	var me: int = _local_id()
-	match view.phase:
-		GuessMatch.Phase.DEAL:
-			if entered:
-				_sfx.play("deal")
-		GuessMatch.Phase.ASK:
-			if view.asker_id == me and (entered or previous.asker_id != me):
-				_sfx.play("your_turn")
-		GuessMatch.Phase.ANSWER:
-			if entered:
-				_sfx.play("question")
-			elif view.answered > previous.answered:
-				_sfx.play("answer_tick", -6.0)
-		GuessMatch.Phase.RESULT:
-			if entered:
-				match view.result:
-					GuessMatch.Answer.YES:
-						_sfx.play("answer_yes")
-					GuessMatch.Answer.NO:
-						_sfx.play("answer_no")
-					_:
-						_sfx.play("answer_unclear")
-		GuessMatch.Phase.REVEAL:
-			if entered:
-				_sfx.play("reveal")
-		GuessMatch.Phase.GAME_OVER:
-			if entered:
-				_sfx.play("win")
-	if previous == null or previous.round_number != view.round_number:
-		return
-	for id: int in view.solved:
-		if not previous.solved.has(id):
-			_sfx.play("solved", 0.0 if id == me else -6.0, 1.0 if id == me else 0.9)
-	for id: int in view.wrong_guesses:
-		if int(view.wrong_guesses[id]) > int(previous.wrong_guesses.get(id, 0)):
-			_sfx.play("wrong", 0.0 if id == me else -8.0)
 
 
 ## Everyone's placard shows their identity, except yours until you solve it (or the

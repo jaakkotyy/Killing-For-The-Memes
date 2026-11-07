@@ -48,7 +48,7 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 .\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 .\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
 .\tools\build_identities.ps1         # rebuild guess mode's identity packs from Wikidata (Python, internet)
-python tools/make_sfx.py             # regenerate the synthesised sound effects in assets/sfx/
+python tools/make_music.py           # re-render the background music loop (assets/music/)
 ```
 
 To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
@@ -129,8 +129,6 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     `MemeStation` and `SearchStation`; `ui/crt/CrtTheme` the shared phosphor look.
     `IdentityPlacard` hangs over each head (`Seat.show_placard`). Both read a duck-typed
     `source` (Session, or `PreviewGuessGame` for `--room-preview --mode=guess`).
-    `GuessPresenter` also plays the mode's sounds through `audio/Sfx` (a small player pool;
-    volume from `Settings.sfx_volume`; `history` for tests), worked out from view diffs.
     Tests: `test_guess_match.gd`, `test_guess_simulation.gd`, `test_custom_packs.gd`,
     `test_portrait.gd`, `test_guess_room.gd`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
@@ -214,8 +212,12 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   (the host's *Play again* returns everyone to the lobby).
 - **`src/util/`** — `LaunchOptions` and `AutoPlayer`, the `--auto-play` bot used by the
   full-game smoke test (random template, random votes, sometimes shoots).
-- **`src/audio/`** — `Sfx`: plays the synthesised WAVs in `assets/sfx/` (all original,
-  made by `tools/make_sfx.py`).
+- **`src/audio/`** — `Music`: the background loop (`assets/music/forgotten_rooms.wav`, a
+  slow, melancholy, mysterious track with little bass, composed in code by
+  `tools/make_music.py`, so it is ours).
+  App owns the player, so it plays from the menu on through every scene; volume is
+  `Settings.music_volume` (0 = off). No music when headless or with `--no-music`
+  (`run_local.ps1` gives that to the client windows). There are no sound effects.
 - **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
   sharing a base class, registered with the server so it can validate their intents.
 - **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).
