@@ -174,7 +174,7 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--seed=<n>` | Fixed random seed for the match: prompts, spotlight order, tie-breaks (host) |
 | `--offline-templates` | Host only our own templates; don't fetch popular ones from Imgflip |
 | `--mode=<mode>` | The host's lobby starts in this mode: `memes` (default) or `guess` ("Who Am I?") |
-| `--pack=<id>` | Guess mode's identity pack, e.g. `musicians` (default) or `movies` (host) |
+| `--pack=<id>` | Guess mode's identity pack (host): `musicians` (default), `movies`, `actors`, `history`, `game_characters`, or a custom pack's id from `user://identities/` |
 | `--room-preview=<n>` | Open the 3D room directly with n fake players (no network); with `--mode=guess` a local guess game |
 | `--room-camera=<view>` | First room camera: `seat` (default), `tv`, `overview` or `editor` |
 

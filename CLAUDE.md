@@ -48,6 +48,7 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 .\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 .\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
 .\tools\build_identities.ps1         # rebuild guess mode's identity packs from Wikidata (Python, internet)
+python tools/make_sfx.py             # regenerate the synthesised sound effects in assets/sfx/
 ```
 
 To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
@@ -112,6 +113,13 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     of `game_match`, Session routes `ask_question`/`ask_stock_question`/`answer_question`/
     `guess_identity` and emits `guess_updated(GuessView, previous)` (`Session.guess_view`).
     Every client loads the pack from its own files (`IdentityPack.load_pack`, cached).
+    Shipped packs: musicians, movies, actors, history, game_characters. Custom packs
+    (`user://identities/<id>.json`, host only; example in `data/identity_examples/`) travel
+    as `pack_text` in `_rpc_game_started` (protocol 8) and clients validate them with
+    `IdentityPack.receive()`; `forget_received()` on leaving. `Portrait.url_for()` rebuilds
+    a Commons thumbnail URL from an entry's `image`; the terminal and placards show it via
+    `TemplateImageCache` when `App.online_images_allowed()` (Wikimedia currently rate-limits
+    us with 429s, so expect them to fail gracefully).
     `util/guess_auto_player.gd` is the guess bot (asks stock questions, answers them
     truthfully, filters, guesses).
     In the room (`GameRoom.is_guess_mode()`), `world/room/GuessPresenter` and
@@ -121,7 +129,10 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     `MemeStation` and `SearchStation`; `ui/crt/CrtTheme` the shared phosphor look.
     `IdentityPlacard` hangs over each head (`Seat.show_placard`). Both read a duck-typed
     `source` (Session, or `PreviewGuessGame` for `--room-preview --mode=guess`).
-    Tests: `test_guess_match.gd`, `test_guess_simulation.gd`.
+    `GuessPresenter` also plays the mode's sounds through `audio/Sfx` (a small player pool;
+    volume from `Settings.sfx_volume`; `history` for tests), worked out from view diffs.
+    Tests: `test_guess_match.gd`, `test_guess_simulation.gd`, `test_custom_packs.gd`,
+    `test_portrait.gd`, `test_guess_room.gd`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`
@@ -203,6 +214,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   (the host's *Play again* returns everyone to the lobby).
 - **`src/util/`** — `LaunchOptions` and `AutoPlayer`, the `--auto-play` bot used by the
   full-game smoke test (random template, random votes, sometimes shoots).
+- **`src/audio/`** — `Sfx`: plays the synthesised WAVs in `assets/sfx/` (all original,
+  made by `tools/make_sfx.py`).
 - **`src/activities/`** — post-MVP "while you wait" activities as self-contained plug-ins
   sharing a base class, registered with the server so it can validate their intents.
 - **`src/autoload/`** — thin singletons only (`Net`, `Platform`, `Session`, `Settings`).

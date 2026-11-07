@@ -65,16 +65,29 @@ terms and the images' rights holders) or switch the source off or to a licensed 
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| Guess mode identity packs (musicians, movies: names, years, countries, genres, directors, awards, sitelink counts) | Wikidata contributors | CC0 1.0 (public domain) | https://www.wikidata.org, built by `tools/build_identities.py` | `data/identities/*.json` |
+| Guess mode identity packs (musicians, movies, actors, historical figures, video game characters: names, years, countries, genres, roles, awards, series, publishers, sitelink counts) | Wikidata contributors | CC0 1.0 (public domain) | https://www.wikidata.org, built by `tools/build_identities.py` | `data/identities/*.json` |
 
 The packs store Wikimedia Commons file names for portraits but no images; each Commons
 file has its own license, so portraits (if used) are fetched at run time and not shipped.
+Video game character names belong to their publishers; the packs only name them as facts
+in a guessing game, with no images or other material from the games.
+
+The example custom pack `data/identity_examples/friends.json` is original (made-up people).
+
+### Portraits (not shipped)
+
+| Name | Owner | License | Source | Path |
+|---|---|---|---|---|
+| Identity portraits (250 px thumbnails) | Each file's author on Wikimedia Commons | Per file (mostly CC BY-SA or public domain); **not checked or attributed per file yet** | `upload.wikimedia.org`, URL rebuilt from the pack's file name | Downloaded at run time to `user://template_cache/` |
+
+Before a commercial release, show each portrait's author and license (Commons' API has
+them) or turn portraits off.
 
 ## Audio
 
 | Name | Author | License | Source | Path |
 |---|---|---|---|---|
-| _none yet_ | | | | |
+| Guess mode sound effects (question, answers, your turn, solved, wrong, reveal, win, deal) | Generated for this project | Original work, all rights reserved | Synthesised from sine/square/saw waves and noise by `tools/make_sfx.py` (standard library only) | `assets/sfx/*.wav` |
 
 ## Original work
 

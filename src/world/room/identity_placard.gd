@@ -2,7 +2,8 @@ class_name IdentityPlacard
 extends Node3D
 ## Guess mode's sign over a player's head, hanging from two chains: everyone else's shows
 ## their secret identity, your own shows "???" until you solve it. It turns to face the
-## camera around its chains, so everyone at the table can read it.
+## camera around its chains, so everyone at the table can read it. With a portrait URL
+## (Portrait.url_for) the picture hangs above the name once it has downloaded.
 ##
 ## Placed by Seat (seat space, above the name label).
 
@@ -14,13 +15,16 @@ const CHAIN_LENGTH: float = 1.4
 const KNOWN_COLOR: Color = Color(0.95, 0.9, 0.78)
 const HIDDEN_COLOR: Color = Color(0.85, 0.3, 0.25)
 const SOLVED_COLOR: Color = Color(0.45, 1.0, 0.62)
+const PICTURE_HEIGHT: float = 0.32
 
 var state: State = State.HIDDEN
 var text: String = ""
+var image_url: String = ""
 
 var _label: Label3D
 var _board: MeshInstance3D
 var _board_material: StandardMaterial3D
+var _picture: Sprite3D
 
 
 func _ready() -> void:
@@ -59,15 +63,21 @@ func _ready() -> void:
 		chain.material_override = steel
 		chain.position = Vector3(x, BOARD_SIZE.y / 2.0 + CHAIN_LENGTH / 2.0, 0)
 		add_child(chain)
-	show_identity(text, state)
+	_picture = Sprite3D.new()
+	_picture.position = Vector3(0, BOARD_SIZE.y / 2.0 + PICTURE_HEIGHT / 2.0 + 0.02, 0.005)
+	_picture.visible = false
+	add_child(_picture)
+	show_identity(text, state, image_url)
 
 
-## What the sign says. HIDDEN shows "???" whatever [param p_text] is.
-func show_identity(p_text: String, p_state: State) -> void:
+## What the sign says. HIDDEN shows "???" whatever [param p_text] is, and no picture.
+func show_identity(p_text: String, p_state: State, p_image_url: String = "") -> void:
 	text = p_text
 	state = p_state
+	image_url = p_image_url if p_state != State.HIDDEN else ""
 	if _label == null:
 		return
+	_update_picture()
 	match state:
 		State.HIDDEN:
 			_label.text = "???"
@@ -79,6 +89,30 @@ func show_identity(p_text: String, p_state: State) -> void:
 			# Long titles get a smaller font so they fit in two or three lines.
 			_label.font_size = 40 if text.length() <= 24 else (32 if text.length() <= 48 else 26)
 	_board_material.albedo_color = Color(0.06, 0.16, 0.09) if state == State.SOLVED else Color(0.12, 0.1, 0.08)
+
+
+func has_picture() -> bool:
+	return _picture != null and _picture.visible
+
+
+func _update_picture() -> void:
+	_picture.visible = false
+	if image_url.is_empty():
+		return
+	var cache: TemplateImageCache = TemplateImageCache.get_instance()
+	if not cache.loaded.is_connected(_on_image_loaded):
+		cache.loaded.connect(_on_image_loaded)
+	var texture: Texture2D = cache.get_texture(image_url)
+	if texture != null:
+		_on_image_loaded(image_url, texture)
+
+
+func _on_image_loaded(url: String, texture: Texture2D) -> void:
+	if url != image_url or texture.get_height() <= 0:
+		return
+	_picture.texture = texture
+	_picture.pixel_size = PICTURE_HEIGHT / texture.get_height()
+	_picture.visible = true
 
 
 func get_label_text() -> String:

@@ -136,39 +136,110 @@ static func from_dict(data: Dictionary) -> IdentityPack:
 
 ## Where the shipped packs live: <PACK_DIR><id>.json.
 const PACK_DIR: String = "res://data/identities/"
+## The players' own packs ("Our friends"): <USER_DIR><id>.json on the host's machine. The
+## host sends a custom pack's file to everyone when the game starts.
+const USER_DIR: String = "user://identities/"
+## A custom pack file must fit in one game-start message.
+const MAX_CUSTOM_BYTES: int = 512 * 1024
+
+static var _loaded: Dictionary = {}  # pack id -> IdentityPack
+static var _loaded_at: Dictionary = {}  # custom pack id -> file modified time when loaded
+## Custom packs the host sent for this game (they win over a local file of the same id).
+static var _received: Dictionary = {}  # pack id -> IdentityPack
 
 
 ## The shipped pack ids, sorted.
-static func available_ids() -> PackedStringArray:
+static func shipped_ids() -> PackedStringArray:
+	return _ids_in(PACK_DIR)
+
+
+## The custom pack ids in USER_DIR (not shadowed by a shipped pack), sorted.
+static func custom_ids() -> PackedStringArray:
 	var ids: PackedStringArray = []
-	for file: String in DirAccess.get_files_at(PACK_DIR):
-		if file.get_extension() == "json" and is_valid_id(file.get_basename()):
-			ids.append(file.get_basename())
-	ids.sort()
+	var shipped: PackedStringArray = shipped_ids()
+	for pack_id: String in _ids_in(USER_DIR):
+		if not shipped.has(pack_id) and FileAccess.get_size(USER_DIR + pack_id + ".json") <= MAX_CUSTOM_BYTES:
+			ids.append(pack_id)
 	return ids
 
 
-## Whether [param pack_id] (untrusted) names a shipped pack.
+## Every pack this machine can host: shipped ones first, then custom ones.
+static func available_ids() -> PackedStringArray:
+	var ids: PackedStringArray = shipped_ids()
+	ids.append_array(custom_ids())
+	return ids
+
+
+static func is_shipped(pack_id: String) -> bool:
+	return shipped_ids().has(pack_id)
+
+
+## Whether [param pack_id] (untrusted) names a pack this machine has (or was sent).
 static func exists(pack_id: Variant) -> bool:
-	return typeof(pack_id) == TYPE_STRING and is_valid_id(pack_id) and available_ids().has(pack_id)
+	return typeof(pack_id) == TYPE_STRING and is_valid_id(pack_id) 		and (_received.has(pack_id) or available_ids().has(pack_id))
 
 
-static var _loaded: Dictionary = {}  # pack id -> IdentityPack
-
-
-## A shipped pack by id, loaded once per run (they are big). Null if there is none.
+## A pack by id, loaded once per run (shipped packs are big); a custom pack is loaded
+## again when its file changes. Null if there is none or it doesn't validate.
 static func load_pack(pack_id: String) -> IdentityPack:
+	if _received.has(pack_id):
+		return _received[pack_id]
 	if not exists(pack_id):
 		return null
-	if not _loaded.has(pack_id):
-		_loaded[pack_id] = load_file(PACK_DIR + pack_id + ".json")
+	if is_shipped(pack_id):
+		if not _loaded.has(pack_id):
+			_loaded[pack_id] = load_file(PACK_DIR + pack_id + ".json")
+		return _loaded[pack_id]
+	var path: String = USER_DIR + pack_id + ".json"
+	var modified: int = FileAccess.get_modified_time(path)
+	if not _loaded.has(pack_id) or _loaded_at.get(pack_id, -1) != modified:
+		_loaded[pack_id] = load_file(path)
+		_loaded_at[pack_id] = modified
+		if _loaded[pack_id] != null:
+			(_loaded[pack_id] as IdentityPack).id = pack_id  # the file name is the id
 	return _loaded[pack_id]
+
+
+## The host: a custom pack's file as text, to send to everyone ("" for a shipped pack).
+static func custom_pack_text(pack_id: String) -> String:
+	if not is_valid_id(pack_id) or is_shipped(pack_id) or not custom_ids().has(pack_id):
+		return ""
+	return FileAccess.get_file_as_string(USER_DIR + pack_id + ".json")
+
+
+## A client: keeps the custom pack the host sent (untrusted text, validated like any
+## pack) under [param pack_id] for this game. Returns null if it isn't a usable pack.
+static func receive(pack_id: String, text: Variant) -> IdentityPack:
+	if not is_valid_id(pack_id) or typeof(text) != TYPE_STRING or (text as String).length() > MAX_CUSTOM_BYTES:
+		return null
+	var pack: IdentityPack = from_json(text)
+	if pack == null or pack.size() == 0:
+		return null
+	pack.id = pack_id
+	_received[pack_id] = pack
+	return pack
+
+
+## Forgets the packs received from a host (leaving a game).
+static func forget_received() -> void:
+	_received.clear()
 
 
 ## A pack's display name without loading it all ("Musicians").
 static func display_name(pack_id: String) -> String:
 	var pack: IdentityPack = load_pack(pack_id)
-	return pack.name if pack != null else pack_id.capitalize()
+	return pack.name if pack != null and not pack.name.is_empty() else pack_id.capitalize()
+
+
+static func _ids_in(dir: String) -> PackedStringArray:
+	var ids: PackedStringArray = []
+	if not DirAccess.dir_exists_absolute(dir):
+		return ids
+	for file: String in DirAccess.get_files_at(dir):
+		if file.get_extension() == "json" and is_valid_id(file.get_basename()):
+			ids.append(file.get_basename())
+	ids.sort()
+	return ids
 
 
 static func is_valid_id(value: String) -> bool:

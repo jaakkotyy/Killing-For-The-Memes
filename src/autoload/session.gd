@@ -326,9 +326,11 @@ func _on_server_game_started(snapshot: Dictionary) -> void:
 	# rejection from ServerController. (ENet's refuse_new_connections leaves them hanging.)
 	var config: Dictionary = _server.config.to_dict()
 	var templates: Array = template_catalogue.duplicate(true)
+	# A custom identity pack ("Our friends") exists only on the host: send its file along.
+	var pack_text: String = IdentityPack.custom_pack_text(_server.lobby.pack) 		if _server.lobby.mode == GameMode.GUESS else ""
 	for player: LobbyPlayer in _server.lobby.get_players():
 		if player.id != local_peer_id():
-			_rpc_game_started.rpc_id(player.id, snapshot, config, templates)
+			_rpc_game_started.rpc_id(player.id, snapshot, config, templates, pack_text)
 	_apply_game_started(snapshot, config, templates)
 
 
@@ -425,7 +427,11 @@ func _rpc_join_rejected(reason: String) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array) -> void:
+func _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array, pack_text: String) -> void:
+	if not pack_text.is_empty():
+		var lobby_pack: String = str(snapshot.get("pack", ""))
+		var received: IdentityPack = IdentityPack.receive(lobby_pack, pack_text)
+		print("[Session] Received the host's pack %s (%d entries)." % [lobby_pack, received.size() if received != null else 0])
 	_apply_game_started(snapshot, config, templates)
 
 
@@ -504,6 +510,7 @@ func _apply_returned_to_lobby(snapshot: Dictionary) -> void:
 func _end(reason: String) -> void:
 	Net.close()
 	_reset()
+	IdentityPack.forget_received()
 	session_ended.emit(reason)
 
 

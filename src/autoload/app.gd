@@ -120,6 +120,12 @@ func _online_templates_wanted() -> bool:
 	return Settings.online_templates and not options.offline_templates
 
 
+## Whether pictures may be fetched from the internet (online templates, guess-mode
+## portraits). Off in settings or with --offline-templates.
+func online_images_allowed() -> bool:
+	return options != null and _online_templates_wanted()
+
+
 func _offer_online_templates() -> void:
 	if not _online_templates_wanted():
 		return

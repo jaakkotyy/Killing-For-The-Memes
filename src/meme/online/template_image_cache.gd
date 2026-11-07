@@ -7,7 +7,8 @@ extends Node
 ## (whole GIFs) are big when decoded, so only the last MAX_ANIMATIONS stay in memory; the
 ## file stays on disk. Every client downloads images itself, straight from the image host,
 ## so images never travel through the game's own network. Only URLs that a catalogue class
-## accepts get here. The shared instance lives under the scene tree's root.
+## accepts get here, and guess mode's portraits (Portrait.url_for). The shared instance
+## lives under the scene tree's root.
 
 signal loaded(url: String, texture: Texture2D)
 signal failed(url: String)
@@ -22,6 +23,12 @@ const MAX_BYTES: int = 8 * 1024 * 1024
 const MAX_TEXTURE_SIDE: int = 1024
 ## Decoded animations kept in memory (a 200 px GIF is a few MB per second of animation).
 const MAX_ANIMATIONS: int = 4
+## "Too many requests" / "busy" answers are retried this often, waiting longer each time
+## (or as long as the server's Retry-After says). Wikimedia answers 429 while it renders a
+## thumbnail nobody asked for lately, and has it ready a few seconds later.
+const MAX_RETRIES: int = 3
+const RETRY_BASE_SECONDS: float = 4.0
+const RETRY_MAX_SECONDS: float = 60.0
 
 ## Tests set this so nothing ever goes to the network; missing images then just fail.
 static var offline: bool = false
@@ -34,6 +41,7 @@ var _failed: Dictionary = {}  # job key -> true
 var _pending: Dictionary = {}  # job key -> true while queued, downloading or decoding
 var _queue: Array[String] = []  # job keys waiting for a download slot
 var _active: int = 0
+var _retries: Dictionary = {}  # job key -> retries so far
 
 
 ## The shared cache. It adds itself to the tree on the next idle frame and starts its
@@ -149,16 +157,37 @@ func _download(key: String) -> void:
 	request.body_size_limit = MAX_BYTES
 	add_child(request)
 	request.request_completed.connect(_on_request_completed.bind(key, request))
-	if request.request(_url_of(key)) != OK:
+	# Wikimedia (portraits) refuses requests without a descriptive User-Agent.
+	if request.request(_url_of(key), PackedStringArray(["User-Agent: " + HttpText.USER_AGENT])) != OK:
 		_on_request_completed(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray(), key, request)
 
 
-func _on_request_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray,
+func _on_request_completed(result: int, code: int, headers: PackedStringArray, body: PackedByteArray,
 		key: String, request: HTTPRequest) -> void:
 	_active -= 1
 	request.queue_free()
 	var ok: bool = result == HTTPRequest.RESULT_SUCCESS and code == 200
+	if (code == 429 or code == 503) and int(_retries.get(key, 0)) < MAX_RETRIES:
+		_retry_later(key, headers)
+		return
+	if not ok:
+		print("[Templates] Download failed (result %d, HTTP %d): %s" % [result, code, _url_of(key)])
 	WorkerThreadPool.add_task(_decode_in_background.bind(key, body if ok else PackedByteArray(), false))
+
+
+## Puts [param key] back in the queue after the server's Retry-After, or a growing wait.
+func _retry_later(key: String, headers: PackedStringArray) -> void:
+	var tries: int = int(_retries.get(key, 0)) + 1
+	_retries[key] = tries
+	var wait: float = RETRY_BASE_SECONDS * pow(2.0, tries - 1)
+	for header: String in headers:
+		if header.to_lower().begins_with("retry-after:"):
+			var value: String = header.get_slice(":", 1).strip_edges()
+			if value.is_valid_int():
+				wait = float(value.to_int())
+	wait = clampf(wait, 1.0, RETRY_MAX_SECONDS)
+	print("[Templates] Busy, retrying in %.0f s: %s" % [wait, _url_of(key)])
+	get_tree().create_timer(wait).timeout.connect(func() -> void: _queue.append(key))
 
 
 ## Runs on a worker thread: decoding a big JPG, let alone a whole GIF, would stall frames.

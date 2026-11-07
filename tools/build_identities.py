@@ -212,6 +212,12 @@ def sounds_musical(description: str) -> bool:
 NOT_MUSICIANS ="wd:Q4964182 wd:Q1234713 wd:Q1028181 wd:Q82955 wd:Q937857 wd:Q169470 wd:Q170790"
 
 
+# Bands have far fewer authority-database ids than people on Wikidata, so by fame alone
+# only 14 bands made the 300 best known (the deal pool). This brings them to about a
+# quarter, roughly what people expect ("Am I a band?" is a fair first question).
+BAND_FAME_BOOST = 1.5
+
+
 def build_musicians() -> dict:
     people: dict[str, int] = {}
     for occupation in MUSIC_OCCUPATIONS:
@@ -256,7 +262,8 @@ def build_musicians() -> dict:
         tags = broad(genres.get(item, []), MUSIC_GENRES)
         if tags:
             fields["genres"] = tags
-        entries.append(_entry(item, names[item], (bands if is_band else people)[item], fields, images.get(item)))
+        fame = round(bands[item] * BAND_FAME_BOOST) if is_band else people[item]
+        entries.append(_entry(item, names[item], fame, fields, images.get(item)))
     return {
         "id": "musicians", "name": "Musicians",
         "fields": [
@@ -356,6 +363,311 @@ def build_movies() -> dict:
     }
 
 
+def _person_basics(ids: list[str]) -> tuple[dict, dict, set, dict, dict]:
+    """Gender, birth dates, the dead, citizenship and pictures for a list of people."""
+    return (values(ids, "P21"), values(ids, "P569", with_label=False), has(ids, "?item wdt:P570 ?d."),
+            most_common(values(ids, "P27")), values(ids, "P18", with_label=False))
+
+
+def _gender(raw: list[str]) -> str | None:
+    if not raw:
+        return None
+    return {"male": "man", "female": "woman"}.get(raw[0], "non-binary")
+
+
+def _described_as(said: dict[str, str], words: list[str]):
+    """A check on English descriptions: True if any of the words appears."""
+    def check(item: str) -> bool:
+        text = said.get(item, "").lower()
+        found = set(re.findall(r"[a-z]+", text))
+        return any((w in text) if " " in w else (w in found) for w in words)
+    return check
+
+
+# Actor, film actor, television actor, voice actor, stage actor.
+ACTOR_OCCUPATIONS = ["Q33999", "Q10800557", "Q10798782", "Q2405480", "Q2259451"]
+# What else an actor does, by occupation: singer, film director, comedian, film producer,
+# screenwriter or writer, model.
+ACTOR_SIDELINES = {"singer": ["Q177220", "Q488205"], "director": ["Q2526255"], "comedian": ["Q245068"],
+                   "producer": ["Q3282637"], "writer": ["Q28389", "Q36180"], "model": ["Q4610556"]}
+
+
+# The first role word in a description says what someone is famous for: "American actress
+# and singer" is an actor, "American singer and actress" (Madonna) a musician, "American
+# politician and actor" (Reagan) a politician.
+ACTING_WORDS = {"actor", "actress", "comedian", "comedienne"}
+OTHER_ROLE_WORDS = {"singer", "rapper", "musician", "songwriter", "politician", "president", "filmmaker",
+                    "director", "producer", "writer", "playwright", "poet", "model", "dancer", "animator",
+                    "businessman", "businesswoman", "entrepreneur", "presenter", "host", "wrestler",
+                    "footballer", "boxer", "athlete", "youtuber", "socialite", "composer", "dj", "artist",
+                    "screenwriter", "journalist", "personality", "monarch", "activist", "magician"}
+
+
+def first_role_is_acting(description: str) -> bool:
+    for word in re.findall(r"[a-z]+", description.lower()):
+        if word in ACTING_WORDS:
+            return True
+        if word in OTHER_ROLE_WORDS:
+            return False
+    return False
+
+
+def build_actors() -> dict:
+    people: dict[str, int] = {}
+    for occupation in ACTOR_OCCUPATIONS:
+        people.update(items_with(f"?item wdt:P106 wd:{occupation}; wdt:P31 wd:Q5.", 60))
+    said = descriptions(sorted(people))
+    ids = sorted(i for i in people if first_role_is_acting(said.get(i, "")))
+    print(f"actors: {len(ids)} people")
+    names = labels(ids)
+    gender, born, dead, country, images = _person_basics(ids)
+    oscar = has(ids, "?item wdt:P166 ?award. ?award wdt:P31 wd:Q19020.")
+    sidelines = {name: has(ids, "VALUES ?occ { %s } ?item wdt:P106 ?occ." % " ".join("wd:" + q for q in qs))
+                 for name, qs in ACTOR_SIDELINES.items()}
+
+    entries = []
+    for item in ids:
+        if item not in names or names[item] == item:
+            continue
+        fields: dict = {"alive": item not in dead, "oscar": item in oscar}
+        if _gender(gender.get(item, [])):
+            fields["gender"] = _gender(gender[item])
+        year = first_year(born.get(item, []))
+        if year is not None:
+            fields["born"] = year
+        if item in country:
+            fields["country"] = country[item]
+        also = [name for name, who in sidelines.items() if item in who]
+        if also:
+            fields["also"] = also
+        entries.append(_entry(item, names[item], people[item], fields, images.get(item)))
+    return {
+        "id": "actors", "name": "Actors",
+        "fields": [
+            {"id": "gender", "name": "Gender", "type": "enum"},
+            {"id": "born", "name": "Born", "type": "year"},
+            {"id": "alive", "name": "Alive", "type": "bool"},
+            {"id": "country", "name": "Country", "type": "enum"},
+            {"id": "oscar", "name": "Won an Oscar", "type": "bool"},
+            {"id": "also", "name": "Also a", "type": "tags"},
+        ],
+        "questions": [
+            _q("Am I a woman?", "gender", "is", "woman"),
+            _q("Am I a man?", "gender", "is", "man"),
+            _q("Was I born before 1950?", "born", "before", 1950),
+            _q("Was I born before 1970?", "born", "before", 1970),
+            _q("Was I born in 1985 or later?", "born", "from", 1985),
+            _q("Am I still alive?", "alive", "is", True),
+            _q("Am I from the United States?", "country", "is", "United States"),
+            _q("Am I from the United Kingdom?", "country", "is", "United Kingdom"),
+            _q("Have I won an Oscar?", "oscar", "is", True),
+            _q("Do I sing too?", "also", "has", "singer"),
+            _q("Have I directed films?", "also", "has", "director"),
+            _q("Am I a comedian?", "also", "has", "comedian"),
+            _q("Have I worked as a model?", "also", "has", "model"),
+        ],
+        "entries": entries,
+    }
+
+
+# Who made history: occupations whose famous members are mostly long dead. Monarch,
+# politician, military officer, philosopher, scientist, physicist, mathematician, writer,
+# poet, painter, explorer, composer, inventor, chemist, astronomer, religious leader,
+# sculptor, military leader, saint, pharaoh, emperor.
+HISTORY_OCCUPATIONS = ["Q116", "Q82955", "Q189290", "Q4964182", "Q901", "Q169470", "Q170790", "Q36180",
+                       "Q49757", "Q1028181", "Q11900058", "Q36834", "Q205375", "Q593644", "Q11063",
+                       "Q15995642", "Q1281618", "Q47064", "Q43115", "Q37110", "Q39018"]
+# The roles a player can ask about, from the English description ("Roman emperor").
+HISTORY_ROLES = {
+    "ruler": ["king", "queen", "emperor", "empress", "pharaoh", "monarch", "sultan", "tsar", "czar",
+              "shah", "caliph", "khan", "prince", "princess", "duke", "ruler", "consort", "regent"],
+    "politician": ["politician", "president", "prime minister", "statesman", "revolutionary",
+                   "chancellor", "senator", "founding father", "dictator", "activist"],
+    "military": ["general", "military", "admiral", "commander", "soldier", "conqueror", "warrior", "marshal"],
+    "scientist": ["scientist", "physicist", "chemist", "mathematician", "astronomer", "biologist",
+                  "naturalist", "inventor", "engineer", "physician", "polymath", "geographer"],
+    "philosopher": ["philosopher", "thinker", "economist"],
+    "writer": ["writer", "poet", "novelist", "playwright", "author", "dramatist", "historian"],
+    "artist": ["painter", "sculptor", "artist", "architect"],
+    "composer": ["composer", "musician", "pianist"],
+    "religious": ["saint", "pope", "prophet", "theologian", "religious", "bishop", "apostle", "monk",
+                  "preacher", "reformer", "rabbi"],
+    "explorer": ["explorer", "navigator", "aviator", "traveller", "traveler"],
+}
+
+
+def _roles(description: str, groups: dict[str, list[str]]) -> list[str]:
+    """Whole-word matches only ("general" is a role, "generally" isn't)."""
+    text = description.lower()
+    words = set(re.findall(r"[a-z]+", text))
+    return [name for name, keys in groups.items()
+            if any((k in text) if " " in k else (k in words) for k in keys)]
+
+
+def build_history() -> dict:
+    people: dict[str, int] = {}
+    for occupation in HISTORY_OCCUPATIONS:
+        people.update(items_with(f"?item wdt:P106 wd:{occupation}; wdt:P31 wd:Q5.", 110))
+    ids = sorted(people)
+    born = values(ids, "P569", with_label=False)
+    # Historical: born before 1900, so everyone in the pack is long gone.
+    ids = [i for i in ids if (first_year(born.get(i, [])) or 9999) < 1900]
+    said = descriptions(ids)
+    roles = {i: _roles(said.get(i, ""), HISTORY_ROLES) for i in ids}
+    ids = [i for i in ids if roles[i]]
+    print(f"history: {len(ids)} people")
+    names = labels(ids)
+    gender, born, _dead, country, images = _person_basics(ids)
+    # Empires (Rome, Russia...) sit on "Eurasia" or "Afro-Eurasia"; keep real continents only.
+    continent = most_common({i: [c for c in cs if "Eurasia" not in c]
+                             for i, cs in values(ids, "P27/wdt:P30").items()})
+
+    entries = []
+    for item in ids:
+        if item not in names or names[item] == item:
+            continue
+        fields: dict = {"roles": roles[item]}
+        if _gender(gender.get(item, [])):
+            fields["gender"] = _gender(gender[item])
+        year = first_year(born.get(item, []))
+        if year is not None:
+            fields["born"] = year
+        if item in continent:
+            fields["continent"] = continent[item]
+        if item in country:
+            fields["country"] = country[item]
+        entries.append(_entry(item, names[item], people[item], fields, images.get(item)))
+    return {
+        "id": "history", "name": "Historical figures",
+        "fields": [
+            {"id": "roles", "name": "Known as", "type": "tags"},
+            {"id": "gender", "name": "Gender", "type": "enum"},
+            {"id": "born", "name": "Born", "type": "year"},
+            {"id": "continent", "name": "Continent", "type": "enum"},
+            {"id": "country", "name": "Country", "type": "enum"},
+        ],
+        "questions": [
+            _q("Am I a woman?", "gender", "is", "woman"),
+            _q("Was I born before year 0 (BC)?", "born", "before", 0),
+            _q("Was I born before 1500?", "born", "before", 1500),
+            _q("Was I born before 1800?", "born", "before", 1800),
+            _q("Am I from Europe?", "continent", "is", "Europe"),
+            _q("Am I from Asia?", "continent", "is", "Asia"),
+            _q("Am I from North America?", "continent", "is", "North America"),
+            _q("Was I a ruler (king, queen, emperor...)?", "roles", "has", "ruler"),
+            _q("Was I a politician or statesman?", "roles", "has", "politician"),
+            _q("Was I a military leader?", "roles", "has", "military"),
+            _q("Was I a scientist or inventor?", "roles", "has", "scientist"),
+            _q("Was I a philosopher?", "roles", "has", "philosopher"),
+            _q("Was I a writer or poet?", "roles", "has", "writer"),
+            _q("Was I an artist?", "roles", "has", "artist"),
+            _q("Was I a composer?", "roles", "has", "composer"),
+            _q("Was I a religious figure?", "roles", "has", "religious"),
+            _q("Was I an explorer?", "roles", "has", "explorer"),
+        ],
+        "entries": entries,
+    }
+
+
+# What a character is, from its "instance of" labels ("fictional hedgehog"), matched as
+# whole words, in this order: a cyborg is a robot, "fictional human" beats "anthropomorphic
+# fox" (Wikidata says both about some). Franchise labels ("Sonic the Hedgehog character")
+# say nothing about the character itself and are skipped.
+CHARACTER_KINDS = {
+    "robot": ["robot", "android", "cyborg", "artificial intelligence"],
+    "human": ["human", "hylian", "gerudo", "elf"],
+    "animal": ["animal", "hedgehog", "fox", "cat", "dog", "bird", "dinosaur", "mouse", "rabbit",
+               "bear", "monkey", "ape", "gorilla", "pig", "frog", "turtle", "duck", "echidna", "bandicoot",
+               "marsupial", "dragon", "lizard", "snake", "wolf", "koopa"],
+    "monster": ["monster", "creature", "demon", "alien", "extraterrestrial", "undead", "zombie",
+                "ghost", "skeleton", "revenant", "slime", "orc", "vampire", "mob"],
+}
+
+
+def _character_kind(labels_: list[str]) -> str | None:
+    words: set[str] = set()
+    for label in labels_:
+        text = label.lower()
+        if text.endswith(" character") or text.endswith(" enemy"):
+            continue
+        words.update(re.findall(r"[a-zé]+", text))
+        if "artificial intelligence" in text:
+            words.add("artificial intelligence")
+    for kind, keys in CHARACTER_KINDS.items():
+        if any(k in words for k in keys):
+            return kind
+    return None
+
+
+def build_game_characters() -> dict:
+    # Characters who debuted in a video game: "video game character" alone also covers
+    # Mickey Mouse and Darth Vader, who merely appear in games.
+    found = items_with("?item wdt:P31/wdt:P279* wd:Q1569167; wdt:P4584 ?debut. "
+                       "?debut wdt:P31/wdt:P279* wd:Q7889.", 5)
+    ids = sorted(found)
+    print(f"game characters: {len(ids)} characters")
+    names = labels(ids)
+    gender = values(ids, "P21")
+    kinds_raw = values(ids, "P31")
+    franchise = values(ids, "P8345")
+    first_year_raw = values(ids, "P4584/wdt:P577", with_label=False)
+    publisher = most_common(values(ids, "P4584/wdt:P123"))
+    developer = most_common(values(ids, "P4584/wdt:P178"))
+    # No "villain" field: Wikidata marks only a handful, and a missing mark would cross out
+    # real villains like Dr. Eggman on a "Yes".
+    images = values(ids, "P18", with_label=False)
+
+    entries = []
+    for item in ids:
+        if item not in names or names[item] == item:
+            continue
+        fields: dict = {}
+        g = _gender(gender.get(item, []))
+        if g in ("man", "woman"):
+            fields["gender"] = g
+        kind = _character_kind(kinds_raw.get(item, []))
+        if kind:
+            fields["kind"] = kind
+        if franchise.get(item):
+            fields["series"] = franchise[item][0]
+        year = first_year(first_year_raw.get(item, []))
+        if year is not None:
+            fields["first"] = year
+        if item in publisher:
+            fields["publisher"] = publisher[item]
+        if item in developer:
+            fields["developer"] = developer[item]
+        entries.append(_entry(item, names[item], found[item], fields, images.get(item)))
+    return {
+        "id": "game_characters", "name": "Video game characters",
+        "fields": [
+            {"id": "kind", "name": "Kind", "type": "enum"},
+            {"id": "gender", "name": "Gender", "type": "enum"},
+            {"id": "series", "name": "Series", "type": "enum"},
+            {"id": "first", "name": "First appeared", "type": "year"},
+            {"id": "publisher", "name": "Publisher", "type": "enum"},
+            {"id": "developer", "name": "Developer", "type": "enum"},
+        ],
+        "questions": [
+            _q("Am I human?", "kind", "is", "human"),
+            _q("Am I an animal?", "kind", "is", "animal"),
+            _q("Am I a robot?", "kind", "is", "robot"),
+            _q("Am I a monster or creature?", "kind", "is", "monster"),
+            _q("Am I female?", "gender", "is", "woman"),
+            _q("Did I first appear before 1990?", "first", "before", 1990),
+            _q("Did I first appear before 2000?", "first", "before", 2000),
+            _q("Did I first appear in 2010 or later?", "first", "from", 2010),
+            _q("Am I from a Nintendo game?", "publisher", "is", "Nintendo"),
+            _q("Am I from a Sega game?", "publisher", "is", "Sega"),
+            _q("Am I from a Capcom game?", "publisher", "is", "Capcom"),
+            _q("Am I from a Square Enix game?", "publisher", "is", "Square Enix"),
+            _q("Am I a Mario character?", "series", "is", "Mario"),
+            _q("Am I from The Legend of Zelda?", "series", "is", "The Legend of Zelda"),
+        ],
+        "entries": entries,
+    }
+
+
 def _entry(item: str, name: str, fame: int, fields: dict, images: list[str] | None) -> dict:
     entry = {"id": item, "name": name, "fame": fame, "fields": fields}
     if images:
@@ -398,13 +710,14 @@ def write(pack: dict) -> None:
     lines = ",\n".join("\t\t" + json.dumps(e, ensure_ascii=False) for e in pack["entries"])
     text = json.dumps(head, ensure_ascii=False, indent="\t")[:-2] + ',\n\t"entries": [\n' + lines + "\n\t]\n}\n"
     json.loads(text)  # never write a broken pack
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
     counts = collections.Counter(f for e in pack["entries"] for f in e["fields"])
     print(f"wrote {path.relative_to(ROOT)}: {len(pack['entries'])} entries, "
           f"{len(pack['questions'])} stock questions, field coverage {dict(counts)}")
 
 
-BUILDERS = {"musicians": build_musicians, "movies": build_movies}
+BUILDERS = {"musicians": build_musicians, "movies": build_movies, "actors": build_actors,
+            "history": build_history, "game_characters": build_game_characters}
 
 if __name__ == "__main__":
     wanted = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BUILDERS)

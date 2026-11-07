@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"id": "example_friends",
+	"name": "Our friends (example)",
+	"source": "Write your own: copy this file, rename it and fill in your friends.",
+	"fields": [
+		{"id": "glasses", "name": "Wears glasses", "type": "bool"},
+		{"id": "hair", "name": "Hair", "type": "enum"},
+		{"id": "born", "name": "Born", "type": "year"},
+		{"id": "city", "name": "Lives in", "type": "enum"},
+		{"id": "likes", "name": "Likes", "type": "tags"}
+	],
+	"questions": [
+		{"text": "Do I wear glasses?", "filter": {"field": "glasses", "op": "is", "value": true}},
+		{"text": "Do I have dark hair?", "filter": {"field": "hair", "op": "is", "value": "dark"}},
+		{"text": "Was I born before 1995?", "filter": {"field": "born", "op": "before", "value": 1995}},
+		{"text": "Do I like games?", "filter": {"field": "likes", "op": "has", "value": "games"}},
+		{"text": "Do I like music?", "filter": {"field": "likes", "op": "has", "value": "music"}}
+	],
+	"entries": [
+		{"id": "alex", "name": "Alex", "fame": 10, "fields": {"glasses": true, "hair": "dark", "born": 1992, "city": "Helsinki", "likes": ["games", "music"]}},
+		{"id": "sam", "name": "Sam", "fame": 10, "fields": {"glasses": false, "hair": "blond", "born": 1996, "city": "Tampere", "likes": ["sports"]}},
+		{"id": "robin", "name": "Robin", "fame": 10, "fields": {"glasses": false, "hair": "red", "born": 1990, "city": "Helsinki", "likes": ["music", "cooking"]}},
+		{"id": "kim", "name": "Kim", "fame": 10, "fields": {"glasses": true, "hair": "blond", "born": 1998, "city": "Turku", "likes": ["games"]}},
+		{"id": "noa", "name": "Noa", "fame": 10, "fields": {"glasses": false, "hair": "dark", "born": 1994, "city": "Tampere", "likes": ["cooking", "sports"]}},
+		{"id": "ilo", "name": "Ilo", "fame": 10, "fields": {"glasses": true, "hair": "dark", "born": 1999, "city": "Oulu", "likes": ["music"]}},
+		{"id": "vilja", "name": "Vilja", "fame": 10, "fields": {"glasses": false, "hair": "blond", "born": 1993, "city": "Helsinki", "likes": ["games", "sports"]}},
+		{"id": "eino", "name": "Eino", "fame": 10, "fields": {"glasses": false, "hair": "red", "born": 1997, "city": "Turku", "likes": ["cooking"]}}
+	]
+}

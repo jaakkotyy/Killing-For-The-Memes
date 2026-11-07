@@ -2,10 +2,15 @@ extends Control
 ## Lobby: lists players, lets guests ready up and lets the host pick the game (mode and,
 ## for guess mode, the identity pack) and start.
 ## Purely a view over Session.lobby; every action goes through Session.
+##
+## The host's own identity packs ("Our friends") live in IdentityPack.USER_DIR; "Your packs
+## folder" opens it (with an example pack to copy the first time), and the list reloads
+## when the window gets the focus back.
 
 const _READY_COLOR: Color = Color(0.45, 0.85, 0.45)
 const _WAITING_COLOR: Color = Color(0.65, 0.6, 0.55)
 const _HOST_COLOR: Color = Color(0.95, 0.75, 0.35)
+const _EXAMPLE_PACK: String = "res://data/identity_examples/friends.json"
 
 @onready var _join_info_label: Label = %JoinInfoLabel
 @onready var _copy_code_button: Button = %CopyCodeButton
@@ -17,6 +22,7 @@ const _HOST_COLOR: Color = Color(0.95, 0.75, 0.35)
 @onready var _mode_option: OptionButton = %ModeOption
 @onready var _pack_option: OptionButton = %PackOption
 @onready var _mode_label: Label = %ModeLabel
+@onready var _packs_button: Button = %PacksButton
 
 var _join_code: String = ""
 var _pack_ids: PackedStringArray = []
@@ -41,16 +47,48 @@ func _setup_mode_picker() -> void:
 	var host: bool = Session.is_host()
 	_mode_option.visible = host
 	_pack_option.visible = host
+	_packs_button.visible = false
 	_mode_label.visible = not host
 	if not host:
 		return
 	for mode: String in GameMode.ALL:
 		_mode_option.add_item(GameMode.label(mode))
-	_pack_ids = IdentityPack.available_ids()
-	for pack_id: String in _pack_ids:
-		_pack_option.add_item(IdentityPack.display_name(pack_id))
+	_reload_packs()
 	_mode_option.item_selected.connect(func(_index: int) -> void: _send_mode())
 	_pack_option.item_selected.connect(func(_index: int) -> void: _send_mode())
+	_packs_button.pressed.connect(_open_packs_folder)
+
+
+## Fills the pack list; custom packs are marked as yours.
+func _reload_packs() -> void:
+	_pack_ids = IdentityPack.available_ids()
+	_pack_option.clear()
+	for pack_id: String in _pack_ids:
+		var label: String = IdentityPack.display_name(pack_id)
+		if not IdentityPack.is_shipped(pack_id):
+			label += "  (yours)"
+		_pack_option.add_item(label)
+	var index: int = _pack_ids.find(Session.lobby.pack)
+	if index >= 0:
+		_pack_option.select(index)
+
+
+## Opens the custom packs folder, putting the example pack there if it has none yet.
+func _open_packs_folder() -> void:
+	DirAccess.make_dir_recursive_absolute(IdentityPack.USER_DIR)
+	if IdentityPack.custom_ids().is_empty():
+		var example: String = FileAccess.get_file_as_string(_EXAMPLE_PACK)
+		var file := FileAccess.open(IdentityPack.USER_DIR + "example_friends.json", FileAccess.WRITE)
+		if file != null and not example.is_empty():
+			file.store_string(example)
+		file = null
+		_reload_packs()
+	OS.shell_open(ProjectSettings.globalize_path(IdentityPack.USER_DIR))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN and is_node_ready() and Session.is_host():
+		_reload_packs()
 
 
 func _send_mode() -> void:
@@ -103,6 +141,7 @@ func _show_mode(lobby: LobbyState) -> void:
 	if Session.is_host():
 		_mode_option.select(maxi(0, GameMode.ALL.find(lobby.mode)))
 		_pack_option.visible = guess
+		_packs_button.visible = guess
 		var pack_index: int = _pack_ids.find(lobby.pack)
 		if pack_index >= 0:
 			_pack_option.select(pack_index)

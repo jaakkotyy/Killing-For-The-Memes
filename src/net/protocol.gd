@@ -11,10 +11,13 @@ extends RefCounted
 ##   server → client  _rpc_lobby_snapshot(snapshot: Dictionary)   # LobbyState.to_dict(), with
 ##                    # the host's mode ("memes" | "guess") and identity pack id
 ##   server → client  _rpc_join_rejected(reason: String)           # followed by a kick
-##   server → client  _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array)
+##   server → client  _rpc_game_started(snapshot: Dictionary, config: Dictionary, templates: Array,
+##                    #   pack_text: String)
 ##                    # LobbyState.to_dict(), GameConfig.to_dict(), online template catalogue
 ##                    # ([{id, name, url, width, height, still_url?, thumb_url?, animated?}],
-##                    # validated with TemplateCatalogue on arrival; [] = originals only)
+##                    # validated with TemplateCatalogue on arrival; [] = originals only), and
+##                    # a custom identity pack's JSON file ("" for a shipped pack), validated
+##                    # with IdentityPack.receive() on arrival
 ##
 ## A meme's template_id may be any valid online id (imgflip-<file>, giphy-<id>,
 ## reddit-<file>-<ext>): the id names its image, so every client can draw it.
@@ -28,8 +31,9 @@ extends RefCounted
 ##   client → server  _rpc_ask(question: Dictionary)               # {text: String} or {stock: int}
 ##   client → server  _rpc_answer(value: int)                      # 1 Yes, -1 No, 0 "I don't know"
 ##   client → server  _rpc_guess(entry_id: String)                 # an entry id of the game's pack
-## Every client loads the pack (data/identities/<id>.json) from its own files, so packs
+## Every client loads a shipped pack (data/identities/<id>.json) from its own files, so packs
 ## must be identical between builds that share a VERSION: bump it when packs are rebuilt.
+## A custom pack (user://identities/<id>.json, host only) travels in _rpc_game_started.
 ##   server → client  _rpc_returned_to_lobby(snapshot: Dictionary) # LobbyState.to_dict()
 ##   client → server  _rpc_search_templates(query: String)         # text, or "r/<subreddit>"
 ##   server → client  _rpc_template_search_results(query: String, entries: Array)
@@ -43,7 +47,7 @@ extends RefCounted
 ## RPC at all. A snapshot's time_left is -1 when the phase has no timer (the host is
 ## presenting at their own pace; GameConfig.host_paces_spotlight).
 
-const VERSION: int = 7
+const VERSION: int = 8
 
 const DEFAULT_PORT: int = 7777
 const MAX_PLAYERS: int = 8

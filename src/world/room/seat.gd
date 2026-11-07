@@ -98,14 +98,14 @@ func flash_shot(target: Vector3) -> void:
 
 
 ## Guess mode: shows [param text] on the sign over this player's head (made on first use).
-func show_placard(text: String, state: IdentityPlacard.State) -> void:
+func show_placard(text: String, state: IdentityPlacard.State, image_url: String = "") -> void:
 	if placard == null:
 		placard = IdentityPlacard.new()
 		placard.name = "Placard"
 		placard.position = PlayerAvatar.metric_vector("seated_eyes") + Vector3(0, 0.66, -0.05)
 		add_child(placard)
 	placard.visible = true
-	placard.show_identity(text, state)
+	placard.show_identity(text, state, image_url)
 
 
 func hide_placard() -> void:

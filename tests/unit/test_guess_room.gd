@@ -9,6 +9,8 @@ var preview: PreviewGuessGame
 
 
 func before_each() -> void:
+	# Portraits would come from the internet.
+	TemplateImageCache.offline = true
 	room = ROOM_SCENE.instantiate()
 	room.preview_players = 3
 	room.preview_mode = GameMode.GUESS
@@ -16,6 +18,17 @@ func before_each() -> void:
 	add_child_autofree(room)
 	await wait_physics_frames(2)
 	preview = room.get_preview_game()
+
+
+func after_each() -> void:
+	TemplateImageCache.offline = false
+
+
+func _presenter() -> GuessPresenter:
+	for child: Node in room.get_children():
+		if child is GuessPresenter:
+			return child
+	return null
 
 
 func _game() -> GuessMatch:
@@ -62,6 +75,10 @@ func test_a_turn_through_the_terminal_reaches_the_tv_and_hud() -> void:
 	var question: String = preview.guess_pack().stock_question(0).text
 	assert_eq(room.get_tv().get_caption()[0], question, "the question is on the TV")
 	assert_string_contains(room.get_guess_hud().get_question_text(), question)
+	var sounds: PackedStringArray = _presenter().get_sfx().history
+	assert_true(sounds.has("deal"))
+	assert_true(sounds.has("your_turn"))
+	assert_eq(sounds[-1], "question")
 
 
 func test_solving_turns_your_placard_green() -> void:
@@ -72,6 +89,7 @@ func test_solving_turns_your_placard_green() -> void:
 	assert_true(_game().is_solved(1))
 	var placard: IdentityPlacard = room.get_seat(1).placard
 	assert_eq(placard.state, IdentityPlacard.State.SOLVED)
+	assert_eq(_presenter().get_sfx().history[-1], "solved")
 	assert_eq(placard.get_label_text(), preview.guess_pack().get_entry(_game().identity_of(1)).name)
 
 

@@ -35,6 +35,8 @@ const TEXT_LIST: int = 15
 
 var pack: IdentityPack
 var query := IdentityQuery.new()
+## Show the selected candidate's Commons portrait (fetched from the internet).
+var portraits_enabled: bool = false
 
 var _view: GuessView
 var _me: int = 0
@@ -77,6 +79,9 @@ var _stock_button: Button
 var _search_edit: LineEdit
 var _result_list: ItemList
 var _detail_label: Label
+var _portrait: TextureRect
+## The portrait URL the detail pane is waiting for ("" when none).
+var _portrait_url: String = ""
 var _status_label: Label
 var _guess_button: Button
 var _answer_bar: Control
@@ -411,6 +416,7 @@ func _refresh_detail() -> void:
 	if _detail_label == null:
 		return
 	var entry: IdentityPack.Entry = pack.get_entry(_selected_id) if pack != null else null
+	_show_portrait(entry)
 	if entry == null:
 		_detail_label.text = tr("Select a candidate. Right-click crosses one out.")
 		return
@@ -422,6 +428,31 @@ func _refresh_detail() -> void:
 	if _placards.has(entry.id):
 		text += "\n" + tr("On %s's placard, so not you.") % _placards[entry.id]
 	_detail_label.text = text
+
+
+func _show_portrait(entry: IdentityPack.Entry) -> void:
+	var url: String = Portrait.url_for(entry.image) if entry != null and portraits_enabled else ""
+	_portrait_url = url
+	_portrait.texture = null
+	_portrait.visible = not url.is_empty()
+	if url.is_empty():
+		return
+	var cache: TemplateImageCache = TemplateImageCache.get_instance()
+	if not cache.loaded.is_connected(_on_portrait_loaded):
+		cache.loaded.connect(_on_portrait_loaded)
+		cache.failed.connect(_on_portrait_failed)
+	_portrait.texture = cache.get_texture(url)
+	_portrait.visible = _portrait.texture != null or not cache.has_failed(url)
+
+
+func _on_portrait_failed(url: String) -> void:
+	if url == _portrait_url and _portrait != null:
+		_portrait.visible = false
+
+
+func _on_portrait_loaded(url: String, texture: Texture2D) -> void:
+	if url == _portrait_url and _portrait != null:
+		_portrait.texture = texture
 
 
 func _refresh_clues() -> void:
@@ -756,11 +787,23 @@ func _build_results() -> Control:
 	_result_list.item_clicked.connect(_on_result_clicked)
 	_result_list.item_activated.connect(func(index: int) -> void: select_entry(_row_ids[index]))
 	right.add_child(_result_list)
+	var detail := HBoxContainer.new()
+	detail.add_theme_constant_override("separation", 10)
+	_portrait = TextureRect.new()
+	_portrait.custom_minimum_size = Vector2(60, 72)
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# A green tint keeps the photo on the phosphor screen's palette.
+	_portrait.modulate = CrtTheme.PHOSPHOR.lerp(Color.WHITE, 0.45)
+	_portrait.visible = false
+	detail.add_child(_portrait)
 	_detail_label = _label("", 13)
-	_detail_label.custom_minimum_size = Vector2(0, 58)
+	_detail_label.custom_minimum_size = Vector2(0, 72)
+	_detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_label.max_lines_visible = 3
-	right.add_child(_detail_label)
+	_detail_label.max_lines_visible = 4
+	detail.add_child(_detail_label)
+	right.add_child(detail)
 	return right
 
 

@@ -9,6 +9,7 @@ func setup(camera: CameraRig, seat: Seat, pack: IdentityPack) -> void:
 	terminal = SearchTerminal.new()
 	terminal.name = "SearchTerminal"
 	terminal.set_pack(pack)
+	terminal.portraits_enabled = App.online_images_allowed()
 	setup_screen(camera, seat, terminal)
 
 

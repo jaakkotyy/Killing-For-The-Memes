@@ -31,7 +31,7 @@ plain `.exe` for windows the user will look at.
 ```powershell
 .\tools\smoke_test.ps1 -Clients 3
 .\tools\smoke_test.ps1 -Clients 3 -FullGame [-Seed 7] [-Online]
-.\tools\smoke_test.ps1 -Clients 3 -FullGame -Mode guess [-Pack movies]
+.\tools\smoke_test.ps1 -Clients 3 -FullGame -Mode guess [-Pack movies|actors|history|game_characters]
 ```
 
 Host + N headless clients join, auto-ready and auto-start. Every instance must print
@@ -51,6 +51,10 @@ rounds play 2). The logs show `[Session] Round n: DEAL/ASK/ANSWER/RESULT/REVEAL`
 bots' `[GuessBot] Guessing <name> (<n> candidates left)`; with 20-second test rounds most
 bots don't solve, which is fine. The headless clients still build the guess room
 (GuessPresenter, GuessHud, SearchStation), so search their logs for `SCRIPT ERROR`.
+To smoke-test a custom pack, write one to the host's `user://identities/<id>.json`
+(`%APPDATA%\Godot\app_userdata\Killing for the Memes\identities\`), run with
+`-Pack <id>`, check that clients print `[Session] Received the host's pack <id> (n entries).`,
+and delete the file afterwards.
 
 ### 2. Custom headless scenario
 
