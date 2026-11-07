@@ -1,6 +1,6 @@
 shader_type spatial;
 // Glowing CRT glass: curved picture, scanlines, vignette. Shows `screen_texture` when
-// `has_picture` is set (the meme editor's SubViewport in M4), otherwise idle static.
+// `has_picture` is set (the search terminal's SubViewport), otherwise idle static.
 
 uniform sampler2D screen_texture : source_color, filter_linear_mipmap, repeat_disable;
 uniform bool has_picture = false;

@@ -6,7 +6,7 @@ extends RefCounted
 ##
 ## A round: DEAL, then turns (ASK → ANSWER → RESULT) until everyone has solved their
 ## identity or the round clock runs out, then REVEAL. After config.guess_rounds rounds,
-## GAME_OVER: most points wins. Nobody dies in this mode; only disconnected players leave.
+## GAME_OVER: most points wins. Nobody is ever out; only disconnected players leave.
 ##
 ## Guesses can come at any time during the turns. A wrong one costs points and locks the
 ## guesser out until their own next turn as asker.

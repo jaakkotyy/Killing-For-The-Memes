@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Adrift"
-config/description="A dark-comedy multiplayer meme party game. Worst meme dies."
+config/description="An online \"Who am I?\" party game on a platform adrift in space."
 config/version="0.1.0"
 run/main_scene="res://src/ui/main_menu/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")

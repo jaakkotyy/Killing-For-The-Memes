@@ -12,7 +12,7 @@ param(
     [int]$Port = 7777,
     [int]$MinPlayers = 0,
     [switch]$AutoStart,
-    # Clients play by themselves (random memes, votes and shots).
+    # Clients play by themselves (stock questions, truthful answers, guesses).
     [switch]$Bots,
     # Short phase timers (debug builds), for checking the round loop quickly.
     [switch]$FastRounds
