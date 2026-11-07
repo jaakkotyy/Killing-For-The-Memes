@@ -100,7 +100,12 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     `IdentityFilter` is one condition (an unknown value never crosses an entry out;
     `negated()` is what a "No" means), `IdentityQuery` is a terminal search (filters,
     name text, struck-out candidates, fame order), `IdentityDeck` deals distinct
-    identities from the best known `pool_size`.
+    identities from the best known `pool_size`. `GuessMatch` is the mode's rules, with
+    GameMatch's contract (`update(now)`, intents `ask`/`answer`/`guess`/`remove_player`
+    returning `GameMatch.IntentResult`, `to_snapshot(now, viewer)` that never contains
+    the viewer's own unsolved identity; snapshots carry `"mode": "guess"`). Phase timers
+    plus a round clock; points, no deaths. `GuessView` is the client's parsed snapshot.
+    Tests: `test_guess_match.gd`, `test_guess_simulation.gd`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`

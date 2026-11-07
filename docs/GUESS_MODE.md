@@ -17,7 +17,7 @@ guessers score the most points over a few rounds.
 ## Round flow
 
 ```
-WAITING → DEAL → TURN (ASK → ANSWER)×n → ROUND_END → DEAL → … → GAME_OVER
+WAITING → DEAL → (ASK → ANSWER → RESULT)×n → REVEAL → DEAL → … → GAME_OVER
 ```
 
 1. **DEAL.** The server gives every player an identity from the chosen pack (never the
@@ -30,15 +30,19 @@ WAITING → DEAL → TURN (ASK → ANSWER)×n → ROUND_END → DEAL → … →
        database field, so a clear answer becomes a one-click filter on the terminal.
    - **ANSWER** (`answer_duration`, 12 s): the question shows on the wall TV with the
      spotlight on the asker. Everyone else votes **Yes / No / I don't know** (keys 1/2/3).
-     The tally fills in live. The answer is the majority of Yes and No; a tie, or only
-     "I don't know" votes, is recorded as **Unclear**.
+     The TV shows how many have answered, but not how, so nobody just follows the crowd.
+     Answers can change until everyone has answered or the time is up. The answer is the
+     majority of Yes and No; a tie, or only "I don't know" votes, is recorded as **Unclear**.
+   - **RESULT** (`result_duration`, 3 s): the counts and the answer on the TV. Then the
+     next asker. An asker who lets ASK run out simply loses the turn.
    - Every answer goes into the asker's **clue log** on their terminal.
 3. **GUESS (any time).** A player picks an entry from their search results and presses
    Guess. Guesses are database entry ids, never typed names, so spelling never matters.
    - Right: you're **solved** and score points (below). Your placard turns green, and
      you keep answering everyone else's questions.
    - Wrong: `wrong_guess_penalty` points off, and you can't guess again until your next turn.
-4. **ROUND_END** when everyone has solved, or after `round_duration` (4 min). Every
+4. **REVEAL** (`reveal_duration`, 8 s) when everyone has solved, or when the round clock
+   (`round_duration`, 4 min, started after the deal) runs out, whatever phase it is in. Every
    identity is revealed on the wall TV with the round's points.
 5. **GAME_OVER** after `guess_rounds` rounds (3). Most points wins; a tie is shared.
    The winner celebrates, everyone else stays seated (no deaths in this mode).
@@ -120,7 +124,7 @@ learns nothing it couldn't see on the placards anyway.
 
 - [x] **G1 Data.** `IdentityPack`, `IdentityFilter`, `IdentityQuery`, `IdentityDeck` with
   unit tests; the Wikidata build script; first two packs (Musicians, Movies).
-- **G2 Rules.** `GuessMatch` and `GuessView`: deal, turns, own and stock questions,
+- [x] **G2 Rules.** `GuessMatch` and `GuessView`: deal, turns, own and stock questions,
   answers, guesses, points, round end, game over, disconnects, snapshots. Rule tests and
   a seeded full-game simulation (like `test_game_simulation.gd`).
 - **G3 Wiring.** Mode and pack in `GameConfig`/`LobbyState`/lobby UI, `ServerController`
