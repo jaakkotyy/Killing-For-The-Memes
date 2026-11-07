@@ -41,6 +41,7 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 .\tools\smoke_test.ps1 -Clients 3    # headless host + 3 clients must join, ready and start
 .\tools\smoke_test.ps1 -Clients 3 -FullGame   # ...and bots play a whole match to GAME_OVER
 .\tools\smoke_test.ps1 -FullGame -Online      # same, with popular templates from Imgflip (needs internet)
+.\tools\smoke_test.ps1 -FullGame -Mode guess  # bots play a whole guess-mode game (-Pack movies)
 .\tools\run_local.ps1 -Clients 2     # host + 2 clients in tiled windows for manual testing
 .\tools\run_local.ps1 -Bots -FastRounds      # play the host against bot clients
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
@@ -53,8 +54,8 @@ To look at the 3D room without networking: `--room-preview=<n> [--room-camera=se
 (`editor` starts zoomed into your CRT's meme editor).
 To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
 
-Run `run_tests.ps1` before every commit and `smoke_test.ps1` (both modes) before merging
-networking changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
+Run `run_tests.ps1` before every commit and `smoke_test.ps1` (lobby, `-FullGame`, and
+`-FullGame -Mode guess`) before merging networking changes. Developer launch flags (`--host`, `--join=`, `--auto-ready`, …) are documented in
 `src/util/launch_options.gd` and the README.
 
 Godot headless output can be very large; when running it from PowerShell, redirect to a
@@ -105,6 +106,13 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     returning `GameMatch.IntentResult`, `to_snapshot(now, viewer)` that never contains
     the viewer's own unsolved identity; snapshots carry `"mode": "guess"`). Phase timers
     plus a round clock; points, no deaths. `GuessView` is the client's parsed snapshot.
+    The host picks the mode (`GameMode`) and pack in the lobby (`LobbyState.mode`/`pack`,
+    `ServerController.handle_set_mode`); ServerController then runs `guess_match` instead
+    of `game_match`, Session routes `ask_question`/`ask_stock_question`/`answer_question`/
+    `guess_identity` and emits `guess_updated(GuessView, previous)` (`Session.guess_view`).
+    Every client loads the pack from its own files (`IdentityPack.load_pack`, cached).
+    `util/guess_auto_player.gd` is the guess bot (asks stock questions, answers them
+    truthfully, filters, guesses).
     Tests: `test_guess_match.gd`, `test_guess_simulation.gd`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.

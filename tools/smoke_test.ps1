@@ -8,7 +8,10 @@
 # Popular online templates are off by default so the test never depends on the internet;
 # -Online makes the host fetch them from Imgflip and every client download the images.
 #
-# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7] [-Online]
+# -Mode guess plays guess mode ("Who Am I?") instead of the meme game; -Pack picks its
+# identity pack (default: musicians).
+#
+# Usage: .\tools\smoke_test.ps1 [-Clients 2] [-Port 7790] [-FullGame] [-Seed 7] [-Online] [-Mode guess] [-Pack movies]
 
 param(
     [ValidateRange(1, 7)][int]$Clients = 2,
@@ -16,7 +19,9 @@ param(
     [int]$TimeoutSeconds = 0,
     [switch]$FullGame,
     [int]$Seed = 7,
-    [switch]$Online
+    [switch]$Online,
+    [ValidateSet("memes", "guess")][string]$Mode = "memes",
+    [string]$Pack = ""
 )
 
 if ($TimeoutSeconds -le 0) { $TimeoutSeconds = if ($FullGame) { 150 } else { 45 } }
@@ -49,7 +54,9 @@ function Start-Instance([string]$Name, [string[]]$GameArgs) {
     return [pscustomobject]@{ Name = $Name; Process = $proc; Log = $log }
 }
 
-$Instances += Start-Instance "Host" @("--host", "--port=$Port", "--auto-start")
+$HostArgs = @("--host", "--port=$Port", "--auto-start", "--mode=$Mode")
+if ($Pack) { $HostArgs += "--pack=$Pack" }
+$Instances += Start-Instance "Host" $HostArgs
 Start-Sleep -Milliseconds 1000
 for ($i = 1; $i -le $Clients; $i++) {
     $Instances += Start-Instance "Client$i" @("--join=127.0.0.1:$Port", "--auto-ready")

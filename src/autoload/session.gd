@@ -14,6 +14,8 @@ signal lobby_updated(lobby: LobbyState)
 signal game_started
 ## A new match snapshot arrived (also on the host). [param previous] is null for the first.
 signal match_updated(view: MatchView, previous: MatchView)
+## The same for guess mode: a new GuessMatch snapshot. [param previous] is null for the first.
+signal guess_updated(view: GuessView, previous: GuessView)
 ## The host ended a finished game; everyone is back in the lobby.
 signal returned_to_lobby
 ## The session is over. An empty reason means the local player chose to leave.
@@ -48,8 +50,14 @@ var template_catalogue: Array[Dictionary] = []
 var match_templates: Array = []
 ## Host only: fixed match seed (0 = random), for reproducible test games.
 var host_seed: int = 0
-## Latest picture of the running match; null outside a game. Treat as read-only.
+## Host only: the mode and identity pack a new lobby starts with (the host can change
+## them in the lobby). App sets these from --mode / --pack.
+var host_mode: String = GameMode.MEMES
+var host_pack: String = "musicians"
+## Latest picture of the running meme match; null outside a meme game. Treat as read-only.
 var match_view: MatchView = null
+## Latest picture of the running guess match; null outside a guess game. Read-only.
+var guess_view: GuessView = null
 ## The match rules as the host sent them (GameConfig.to_dict()).
 var match_config: Dictionary = {}
 
@@ -140,6 +148,12 @@ func send_template_search_results(peer_id: int, query: String, entries: Array[Di
 		_rpc_template_search_results.rpc_id(peer_id, query, entries)
 
 
+## Host only, in the lobby: the next game's mode (a GameMode) and identity pack.
+func set_game_mode(mode: String, pack: String) -> void:
+	if is_host():
+		_server.handle_set_mode(local_peer_id(), mode, pack)
+
+
 ## Host only. Ignored unless the lobby can start.
 func request_start() -> void:
 	if is_host():
@@ -177,6 +191,50 @@ func present_next() -> void:
 		_server.handle_present_next(local_peer_id(), match_view.spotlight_index, _clock)
 
 
+## Guess mode, on your turn: ask your own yes/no question.
+func ask_question(text: String) -> void:
+	_send_ask({"text": text})
+
+
+## Guess mode, on your turn: ask the pack's stock question number [param index].
+func ask_stock_question(index: int) -> void:
+	_send_ask({"stock": index})
+
+
+## Guess mode: answer the question on the wall TV (a GuessMatch.Answer: 1, -1 or 0).
+func answer_question(value: int) -> void:
+	if is_host():
+		_server.handle_answer(local_peer_id(), value, _clock)
+	elif Net.is_joined():
+		_rpc_answer.rpc_id(1, value)
+
+
+## Guess mode: guess your own identity (an entry id of the game's pack).
+func guess_identity(entry_id: String) -> void:
+	if is_host():
+		_server.handle_guess(local_peer_id(), entry_id, _clock)
+	elif Net.is_joined():
+		_rpc_guess.rpc_id(1, entry_id)
+
+
+## Guess mode: the running game's identity pack (every client has the same files).
+func guess_pack() -> IdentityPack:
+	var pack_id: String = guess_view.pack_id if guess_view != null else lobby.pack
+	return IdentityPack.load_pack(pack_id)
+
+
+## Guess mode: seconds left on the round clock, counted down locally.
+func guess_round_time_left() -> float:
+	return guess_view.round_time_left_at(_clock) if guess_view != null else 0.0
+
+
+func _send_ask(question: Dictionary) -> void:
+	if is_host():
+		_server.handle_ask(local_peer_id(), question, _clock)
+	elif Net.is_joined():
+		_rpc_ask.rpc_id(1, question)
+
+
 ## Whether the host presents the memes at their own pace (no spotlight timer).
 func host_paces_spotlight() -> bool:
 	return bool(match_config.get("host_paces_spotlight", false))
@@ -190,6 +248,8 @@ func return_to_lobby() -> void:
 
 ## Seconds left in the current phase, counted down locally between snapshots.
 func match_time_left() -> float:
+	if guess_view != null:
+		return guess_view.time_left_at(_clock)
 	return match_view.time_left_at(_clock) if match_view != null else 0.0
 
 
@@ -222,6 +282,7 @@ func _on_net_hosted() -> void:
 	_server.game_started.connect(_on_server_game_started)
 	_server.match_changed.connect(_on_server_match_changed)
 	_server.returned_to_lobby.connect(_on_server_returned_to_lobby)
+	_server.handle_set_mode(LobbyState.HOST_ID, host_mode, host_pack)
 	# The host joins its own lobby directly, without an RPC.
 	_server.handle_join_request(multiplayer.get_unique_id(), _local_name, Protocol.VERSION)
 
@@ -326,6 +387,24 @@ func _rpc_shoot() -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
+func _rpc_ask(question: Variant) -> void:
+	if _server != null:
+		_server.handle_ask(multiplayer.get_remote_sender_id(), question, _clock)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_answer(value: Variant) -> void:
+	if _server != null:
+		_server.handle_answer(multiplayer.get_remote_sender_id(), value, _clock)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_guess(entry_id: Variant) -> void:
+	if _server != null:
+		_server.handle_guess(multiplayer.get_remote_sender_id(), entry_id, _clock)
+
+
+@rpc("any_peer", "call_remote", "reliable")
 func _rpc_search_templates(query: Variant) -> void:
 	var sender: int = multiplayer.get_remote_sender_id()
 	if _server != null and lobby.has_player(sender) and typeof(query) == TYPE_STRING:
@@ -380,11 +459,15 @@ func _apply_game_started(snapshot: Dictionary, config: Dictionary, templates: Ar
 	match_config = config
 	match_templates = templates
 	match_view = null
+	guess_view = null
 	print("[Session] Game started with %d players." % lobby.player_count())
 	game_started.emit()
 
 
 func _apply_match_snapshot(snapshot: Dictionary) -> void:
+	if snapshot.get("mode") == GameMode.GUESS:
+		_apply_guess_snapshot(snapshot)
+		return
 	var previous: MatchView = match_view
 	match_view = MatchView.from_snapshot(snapshot, _clock)
 	var phase_changed: bool = previous == null or previous.phase != match_view.phase
@@ -396,8 +479,23 @@ func _apply_match_snapshot(snapshot: Dictionary) -> void:
 	match_updated.emit(match_view, previous)
 
 
+func _apply_guess_snapshot(snapshot: Dictionary) -> void:
+	var previous: GuessView = guess_view
+	guess_view = GuessView.from_snapshot(snapshot, _clock)
+	var phase_changed: bool = previous == null or previous.phase != guess_view.phase
+	if phase_changed:
+		print("[Session] Round %d: %s" % [guess_view.round_number, GuessMatch.Phase.keys()[guess_view.phase]])
+	if phase_changed and guess_view.phase == GuessMatch.Phase.GAME_OVER:
+		var names: PackedStringArray = []
+		for winner: int in guess_view.winner_ids:
+			names.append("%s (%d)" % [guess_view.player_name(winner), guess_view.score_of(winner)])
+		print("[Session] Game over. Winner: %s" % (", ".join(names) if not names.is_empty() else "nobody"))
+	guess_updated.emit(guess_view, previous)
+
+
 func _apply_returned_to_lobby(snapshot: Dictionary) -> void:
 	match_view = null
+	guess_view = null
 	_apply_lobby_snapshot(snapshot)
 	print("[Session] Back in the lobby.")
 	returned_to_lobby.emit()
@@ -413,6 +511,7 @@ func _reset() -> void:
 	_server = null
 	lobby = LobbyState.new()
 	match_view = null
+	guess_view = null
 	match_config = {}
 	match_templates = []
 	_in_lobby = false

@@ -127,7 +127,7 @@ learns nothing it couldn't see on the placards anyway.
 - [x] **G2 Rules.** `GuessMatch` and `GuessView`: deal, turns, own and stock questions,
   answers, guesses, points, round end, game over, disconnects, snapshots. Rule tests and
   a seeded full-game simulation (like `test_game_simulation.gd`).
-- **G3 Wiring.** Mode and pack in `GameConfig`/`LobbyState`/lobby UI, `ServerController`
+- [x] **G3 Wiring.** Mode and pack in `GameConfig`/`LobbyState`/lobby UI, `ServerController`
   and `Session` RPCs, protocol bump, bots, `smoke_test.ps1 -Mode guess` (both modes must pass).
 - **G4 Room.** `SearchStation` terminal, placards, wall TV question and tally, `GuessHud`,
   `GuessPresenter` choreography (spotlight on the asker, reveals at round end), `--room-preview` support.

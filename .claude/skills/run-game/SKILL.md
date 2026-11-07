@@ -31,6 +31,7 @@ plain `.exe` for windows the user will look at.
 ```powershell
 .\tools\smoke_test.ps1 -Clients 3
 .\tools\smoke_test.ps1 -Clients 3 -FullGame [-Seed 7] [-Online]
+.\tools\smoke_test.ps1 -Clients 3 -FullGame -Mode guess [-Pack movies]
 ```
 
 Host + N headless clients join, auto-ready and auto-start. Every instance must print
@@ -43,6 +44,13 @@ Smoke tests pass `--offline-templates` unless `-Online` is given; then the host 
 `GIPHY_API_KEY` in the environment it also logs `[Templates] 25 GIF templates from GIPHY.`
 and bots may submit `giphy-<id>` ids; `GIPHY unreachable (or the key was refused)` means
 a bad key. Check a key's presence with `[ -n "$GIPHY_API_KEY" ]`, never print it.
+
+`-Mode guess` starts the host's lobby in guess mode (`--mode=guess`, `--pack=<id>`) and
+every instance must print `SMOKE_TEST PASS: guess game over after 2 rounds, ...` (fast
+rounds play 2). The logs show `[Session] Round n: DEAL/ASK/ANSWER/RESULT/REVEAL` and the
+bots' `[GuessBot] Guessing <name> (<n> candidates left)`; with 20-second test rounds most
+bots don't solve, which is fine. Until milestone G4 the room shows nothing of a guess
+game (it only listens to meme snapshots).
 
 ### 2. Custom headless scenario
 

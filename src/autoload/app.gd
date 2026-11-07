@@ -9,6 +9,7 @@ const MAIN_MENU_SCENE: String = "res://src/ui/main_menu/main_menu.tscn"
 const LOBBY_SCENE: String = "res://src/ui/lobby/lobby.tscn"
 const ROOM_SCENE: String = "res://src/world/room/room.tscn"
 const AUTO_PLAYER_SCRIPT: GDScript = preload("res://src/util/auto_player.gd")
+const GUESS_AUTO_PLAYER_SCRIPT: GDScript = preload("res://src/util/guess_auto_player.gd")
 
 const _SMOKE_TEST_TIMEOUT: float = 30.0
 ## A whole fast game with up to 8 players takes well under a minute.
@@ -44,16 +45,24 @@ func _ready() -> void:
 		Session.host_config = fast_config()
 	if options.seed_value != 0:
 		Session.host_seed = options.seed_value
+	if not options.mode.is_empty():
+		Session.host_mode = options.mode
+	if not options.pack.is_empty():
+		Session.host_pack = options.pack
 
 	Session.lobby_entered.connect(_on_lobby_entered)
 	Session.game_started.connect(_on_game_started)
 	Session.returned_to_lobby.connect(_on_returned_to_lobby)
 	Session.session_ended.connect(_on_session_ended)
 	Session.match_updated.connect(_on_match_updated)
+	Session.guess_updated.connect(_on_guess_updated)
 	if options.auto_play:
 		var bot: Node = AUTO_PLAYER_SCRIPT.new()
 		bot.name = "AutoPlayer"
 		add_child(bot)
+		var guesser: Node = GUESS_AUTO_PLAYER_SCRIPT.new()
+		guesser.name = "GuessAutoPlayer"
+		add_child(guesser)
 
 	if options.smoke_test:
 		var timeout: float = _SMOKE_TEST_GAME_TIMEOUT if options.smoke_test_full_game else _SMOKE_TEST_TIMEOUT
@@ -68,6 +77,13 @@ static func fast_config() -> GameConfig:
 	config.create_duration = 3.0
 	config.spotlight_duration = 1.0
 	config.elimination_duration = 0.8
+	config.guess_rounds = 2
+	config.deal_duration = 0.5
+	config.round_duration = 20.0
+	config.ask_duration = 2.0
+	config.answer_duration = 1.5
+	config.result_duration = 0.3
+	config.reveal_duration = 0.8
 	return config
 
 
@@ -168,6 +184,18 @@ func _on_match_updated(view: MatchView, previous: MatchView) -> void:
 	if previous == null or previous.phase != GameMatch.Phase.GAME_OVER:
 		var winner: String = view.player_name(view.winner_id) if view.winner_id != 0 else "nobody"
 		_smoke_game_over = "game over after %d rounds, winner %s" % [view.round_number, winner]
+		get_tree().create_timer(_SMOKE_TEST_LINGER).timeout.connect(_finish_smoke_test.bind(0, _smoke_game_over))
+
+
+func _on_guess_updated(view: GuessView, previous: GuessView) -> void:
+	if not options.smoke_test_full_game or view.phase != GuessMatch.Phase.GAME_OVER:
+		return
+	if previous == null or previous.phase != GuessMatch.Phase.GAME_OVER:
+		var names: PackedStringArray = []
+		for winner: int in view.winner_ids:
+			names.append(view.player_name(winner))
+		_smoke_game_over = "guess game over after %d rounds, %d solved in the last, winner %s" % [
+			view.round_number, view.solved.size(), ", ".join(names) if not names.is_empty() else "nobody"]
 		get_tree().create_timer(_SMOKE_TEST_LINGER).timeout.connect(_finish_smoke_test.bind(0, _smoke_game_over))
 
 

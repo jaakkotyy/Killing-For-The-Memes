@@ -142,6 +142,7 @@ merging networking changes.
 .\tools\smoke_test.ps1 -Clients 3
 .\tools\smoke_test.ps1 -Clients 3 -FullGame
 .\tools\smoke_test.ps1 -Clients 3 -FullGame -Online   # with Imgflip templates (needs internet)
+.\tools\smoke_test.ps1 -Clients 3 -FullGame -Mode guess [-Pack movies]   # a whole guess-mode game
 ```
 
 **From the editor:** *Debug → Customize Run Instances…* → enable multiple instances, then
@@ -169,6 +170,8 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--fast-rounds` | Short phase timers (host, debug builds only) |
 | `--seed=<n>` | Fixed random seed for the match: prompts, spotlight order, tie-breaks (host) |
 | `--offline-templates` | Host only our own templates; don't fetch popular ones from Imgflip |
+| `--mode=<mode>` | The host's lobby starts in this mode: `memes` (default) or `guess` ("Who Am I?") |
+| `--pack=<id>` | Guess mode's identity pack, e.g. `musicians` (default) or `movies` (host) |
 | `--room-preview=<n>` | Open the 3D room directly with n fake players (no network) |
 | `--room-camera=<view>` | First room camera: `seat` (default), `tv`, `overview` or `editor` |
 

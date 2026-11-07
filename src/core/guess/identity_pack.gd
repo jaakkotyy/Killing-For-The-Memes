@@ -134,6 +134,43 @@ static func from_dict(data: Dictionary) -> IdentityPack:
 	return pack
 
 
+## Where the shipped packs live: <PACK_DIR><id>.json.
+const PACK_DIR: String = "res://data/identities/"
+
+
+## The shipped pack ids, sorted.
+static func available_ids() -> PackedStringArray:
+	var ids: PackedStringArray = []
+	for file: String in DirAccess.get_files_at(PACK_DIR):
+		if file.get_extension() == "json" and is_valid_id(file.get_basename()):
+			ids.append(file.get_basename())
+	ids.sort()
+	return ids
+
+
+## Whether [param pack_id] (untrusted) names a shipped pack.
+static func exists(pack_id: Variant) -> bool:
+	return typeof(pack_id) == TYPE_STRING and is_valid_id(pack_id) and available_ids().has(pack_id)
+
+
+static var _loaded: Dictionary = {}  # pack id -> IdentityPack
+
+
+## A shipped pack by id, loaded once per run (they are big). Null if there is none.
+static func load_pack(pack_id: String) -> IdentityPack:
+	if not exists(pack_id):
+		return null
+	if not _loaded.has(pack_id):
+		_loaded[pack_id] = load_file(PACK_DIR + pack_id + ".json")
+	return _loaded[pack_id]
+
+
+## A pack's display name without loading it all ("Musicians").
+static func display_name(pack_id: String) -> String:
+	var pack: IdentityPack = load_pack(pack_id)
+	return pack.name if pack != null else pack_id.capitalize()
+
+
 static func is_valid_id(value: String) -> bool:
 	return _id_regex.search(value) != null
 

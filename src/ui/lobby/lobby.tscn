@@ -56,6 +56,30 @@ size_flags_horizontal = 0
 theme_override_font_sizes/font_size = 22
 text = "Copy code"
 
+[node name="ModeRow" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ModeTitle" type="Label" parent="Margin/VBox/ModeRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Game:"
+
+[node name="ModeOption" type="OptionButton" parent="Margin/VBox/ModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="PackOption" type="OptionButton" parent="Margin/VBox/ModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="ModeLabel" type="Label" parent="Margin/VBox/ModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
 [node name="PlayersPanel" type="PanelContainer" parent="Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3

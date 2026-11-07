@@ -1,5 +1,6 @@
 extends Control
-## Lobby: lists players, lets guests ready up and lets the host start.
+## Lobby: lists players, lets guests ready up and lets the host pick the game (mode and,
+## for guess mode, the identity pack) and start.
 ## Purely a view over Session.lobby; every action goes through Session.
 
 const _READY_COLOR: Color = Color(0.45, 0.85, 0.45)
@@ -13,8 +14,12 @@ const _HOST_COLOR: Color = Color(0.95, 0.75, 0.35)
 @onready var _ready_button: Button = %ReadyButton
 @onready var _start_button: Button = %StartButton
 @onready var _leave_button: Button = %LeaveButton
+@onready var _mode_option: OptionButton = %ModeOption
+@onready var _pack_option: OptionButton = %PackOption
+@onready var _mode_label: Label = %ModeLabel
 
 var _join_code: String = ""
+var _pack_ids: PackedStringArray = []
 
 
 func _ready() -> void:
@@ -27,7 +32,31 @@ func _ready() -> void:
 	_ready_button.visible = not Session.is_host()
 	_start_button.visible = Session.is_host()
 	_setup_join_info()
+	_setup_mode_picker()
 	_refresh(Session.lobby)
+
+
+## The host picks with two dropdowns; guests only see what was picked.
+func _setup_mode_picker() -> void:
+	var host: bool = Session.is_host()
+	_mode_option.visible = host
+	_pack_option.visible = host
+	_mode_label.visible = not host
+	if not host:
+		return
+	for mode: String in GameMode.ALL:
+		_mode_option.add_item(GameMode.label(mode))
+	_pack_ids = IdentityPack.available_ids()
+	for pack_id: String in _pack_ids:
+		_pack_option.add_item(IdentityPack.display_name(pack_id))
+	_mode_option.item_selected.connect(func(_index: int) -> void: _send_mode())
+	_pack_option.item_selected.connect(func(_index: int) -> void: _send_mode())
+
+
+func _send_mode() -> void:
+	var mode: String = GameMode.ALL[maxi(0, _mode_option.selected)]
+	var pack: String = _pack_ids[_pack_option.selected] if _pack_option.selected >= 0 and not _pack_ids.is_empty() else Session.lobby.pack
+	Session.set_game_mode(mode, pack)
 
 
 func _setup_join_info() -> void:
@@ -64,7 +93,19 @@ func _refresh(lobby: LobbyState) -> void:
 		_ready_button.text = "Ready!" if local.ready else "Ready up"
 
 	_start_button.disabled = not lobby.can_start(Session.min_players)
+	_show_mode(lobby)
 	_status_label.text = _status_text(lobby)
+
+
+func _show_mode(lobby: LobbyState) -> void:
+	var guess: bool = lobby.mode == GameMode.GUESS
+	_mode_label.text = GameMode.label(lobby.mode) + ("  —  " + IdentityPack.display_name(lobby.pack) if guess else "")
+	if Session.is_host():
+		_mode_option.select(maxi(0, GameMode.ALL.find(lobby.mode)))
+		_pack_option.visible = guess
+		var pack_index: int = _pack_ids.find(lobby.pack)
+		if pack_index >= 0:
+			_pack_option.select(pack_index)
 
 
 func _make_player_row(player: LobbyPlayer) -> Label:
