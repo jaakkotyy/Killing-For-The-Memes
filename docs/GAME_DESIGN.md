@@ -47,9 +47,10 @@ was removed.
 
 - From your seat press **E** or click your monitor: the camera glides in until the CRT
   fills the screen and the editor takes over (still curved and scanlined). **Esc** looks up.
-- Pick one of the templates: popular memes from Imgflip first, then reaction GIFs from
-  GIPHY (both fetched by the host, see CREDITS.md; GIFs need the host's GIPHY key), then
-  our original shots of this room (players in the spotlight, the empty chair...).
+- Pick one of the templates: a shuffled mix of Imgflip templates, fresh Reddit memes and
+  GIFs from GIPHY (fetched by the host, see CREDITS.md; GIFs need the host's GIPHY key),
+  then our original shots of this room (players in the spotlight, the empty chair...).
+  Filter by source, or search Imgflip and GIPHY (or `r/<subreddit>`) through the host.
   Type a top and a bottom caption, press **Done**. GIF memes play on the wall TV.
   Captions are uppercase with a black outline and shrink to fit. You can resubmit until
   time runs out; the draft is submitted automatically at zero.
@@ -131,8 +132,7 @@ was removed.
   meme, bet on who dies to earn bullets, lockpicking minigame for a one-time escape, throwing
   physics objects at the spotlight player.
 - **HP mode**: damage instead of instant death.
-- **GIF search** in the editor (players search GIPHY themselves instead of one host-picked
-  list), and the official "Powered by GIPHY" mark for a production key.
+- The official "Powered by GIPHY" mark for a production key.
 - **Caption boxes per template** (e.g. Drake's two panels) instead of top/bottom only.
 - **Custom prompt packs** (JSON in `data/prompts/`, later user-loadable / Workshop).
 - **Steam**: lobbies, friend invites, P2P relay networking, achievements, rich presence.

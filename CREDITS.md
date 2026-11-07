@@ -49,11 +49,13 @@ room and characters by `tools/capture_templates.ps1`.
 | Name | Owner | License | Source | Path |
 |---|---|---|---|---|
 | Popular meme templates (Imgflip's top list) | Their respective copyright holders | **Not licensed to us** | https://api.imgflip.com/get_memes, images from `i.imgflip.com` | Downloaded at run time to `user://template_cache/` |
-| GIF templates (GIPHY search results, "reaction") | Their respective copyright holders, served by GIPHY | **Not licensed to us**; GIPHY API terms apply | https://developers.giphy.com, files from `media.giphy.com` | Downloaded at run time to `user://template_cache/` |
+| Meme templates (Imgflip's template pages and search) | Their respective copyright holders | **Not licensed to us** | `imgflip.com/memetemplates`, `imgflip.com/memesearch`, images from `i.imgflip.com` | Downloaded at run time to `user://template_cache/` |
+| Fresh memes from subreddits (r/memes, r/dankmemes, r/MemeTemplatesOfficial, r/me_irl, or one a player searches) | Their respective posters and copyright holders | **Not licensed to us**; Reddit's terms apply | https://meme-api.com (relays Reddit's hot posts), images from `i.redd.it`, thumbnails from `preview.redd.it` | Downloaded at run time to `user://template_cache/` |
+| GIF templates (GIPHY search results) | Their respective copyright holders, served by GIPHY | **Not licensed to us**; GIPHY API terms apply | https://developers.giphy.com, files from `media.giphy.com` | Downloaded at run time to `user://template_cache/` |
 
 These images are not in the repository or the builds. The game fetches them on the
 player's machine when the host has online templates on (the default; GIFs only with the
-host's own GIPHY API key) and credits Imgflip and "Powered by GIPHY" in the meme editor.
+host's own GIPHY API key) and credits Imgflip, Reddit via meme-api.com and "Powered by GIPHY" in the meme editor.
 GIPHY's terms require its official attribution mark for a production key; the editor
 shows the words for now. **Before a commercial release**, either clear their use (Imgflip's
 terms and the images' rights holders) or switch the source off or to a licensed provider

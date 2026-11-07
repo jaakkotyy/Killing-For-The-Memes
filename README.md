@@ -30,8 +30,12 @@ integration (GodotSteam) can be added without rewriting the game.
 
 ### Meme templates
 
-Besides our own templates (shots of this room), the host offers the 40 most popular meme
-templates from [Imgflip](https://imgflip.com). The host fetches the list while people
+Besides our own templates (shots of this room), the host offers a fresh mix every game:
+[Imgflip](https://imgflip.com)'s popular templates plus two random pages of its deeper
+catalogue, today's memes from a few subreddits (through [meme-api.com](https://meme-api.com)),
+and GIFs (below). The editor's buttons narrow the list to one source, and its search box
+asks the host to search Imgflip and GIPHY, or a subreddit with `r/<name>`; a meme on a
+template only you found still shows for everyone. The host fetches the list while people
 join; every player downloads the images once and keeps them in
 `%APPDATA%\Godot\app_userdata\Killing for the Memes\template_cache\`. Without internet the
 game falls back to the list saved last time, and then to our own templates only. Turn it
@@ -48,7 +52,7 @@ user account:
 ```
 
 or put `giphy_api_key="<your key>"` under `[general]` in `settings.cfg`. Never commit it.
-Restart the game; the host log then says `[Templates] 25 GIF templates from GIPHY.` GIF
+Restart the game; the host log then says `[Templates] 30 templates from GIPHY.` GIF
 templates are listed as "GIF: ..." and play in the preview and on the wall TV.
 
 ## Requirements

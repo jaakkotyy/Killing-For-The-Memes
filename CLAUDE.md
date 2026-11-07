@@ -18,7 +18,7 @@ Full design: `docs/GAME_DESIGN.md` (source of truth for rules and default number
 - **Everything we ship is original.** Nothing from Saw or other copyrighted media. Only assets
   whose license allows commercial use; every third-party asset goes in `CREDITS.md` in the same commit.
   The one exception is opt-out and never shipped: popular meme templates fetched at run time
-  from Imgflip and GIF templates from GIPHY (`src/meme/online/`). They are other people's
+  from Imgflip, memes from Reddit (via meme-api.com) and GIF templates from GIPHY (`src/meme/online/`). They are other people's
   copyrighted images; their use must be cleared (or the source swapped for a licensed one)
   before a commercial release. Never commit an API key: the GIPHY key lives in the
   `GIPHY_API_KEY` environment variable or the user's `settings.cfg`.
@@ -126,12 +126,18 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   `tools/capture_templates.ps1` (`templates/template_studio.gd`, one `_shot_<id>()` each).
   `online/`: online templates. On the host, `OnlineTemplateSource` fetches Imgflip's top
   stills and, with a GIPHY key (`Settings.get_giphy_api_key()`), reaction GIFs from GIPHY
-  while people join; each provider falls back to its part of the catalogue saved last time.
+  while people join (plus random Imgflip template pages and subreddit memes from meme-api.com,
+  `RedditCatalogue`, shuffled); each provider falls back to its part of the catalogue saved last time.
+  Every online id names its image file (`imgflip-<file>[-png]`, `giphy-<id>`,
+  `reddit-<file>-<ext>`), so `TemplateCatalogue.resolve(id)` draws any valid id and the
+  server accepts any of them (`MemeTemplateLibrary.accepts`, `GameMatch.template_accepts`).
+  `TemplateSearch` (host, App) answers players' editor searches (`Session.search_templates`,
+  Imgflip + GIPHY, or `r/<subreddit>`); results join the library with `add_found()`.
+  `HttpText` runs the host's GETs in parallel.
   App puts it in the library and `Session.set_template_catalogue()`, and
   `_rpc_game_started` sends it to everyone. `TemplateCatalogue` validates it on both ends,
-  per provider: `ImgflipCatalogue` (ids `imgflip-<n>`, URLs only
-  `https://i.imgflip.com/<name>.jpg|png`) and `GiphyCatalogue` (ids `giphy-<id>`, URLs
-  rebuilt from the id, never taken from data). `TemplateImageCache` downloads each file
+  per provider: `ImgflipCatalogue`, `GiphyCatalogue` and `RedditCatalogue`, all with URLs
+  rebuilt from the id, never taken from data. `TemplateImageCache` downloads each file
   once per machine into `user://template_cache/`, decoding on worker threads: stills stay in
   memory, whole GIFs (`AnimatedTemplate`, the last 4) only while needed. `GifDecoder` is
   our own GIF87a/89a decoder (Godot has none), tested pixel-for-pixel against Pillow with
