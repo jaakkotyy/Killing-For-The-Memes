@@ -115,7 +115,7 @@
 			}
 		},
 		{
-			"text": "Am I a action movie?",
+			"text": "Am I an action movie?",
 			"filter": {
 				"field": "genres",
 				"op": "has",

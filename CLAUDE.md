@@ -51,7 +51,8 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 ```
 
 To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
-(`editor` starts zoomed into your CRT's meme editor).
+(`editor` starts zoomed into your CRT's meme editor). Add `--mode=guess [--pack=<id>]`
+for a local guess game with the search terminal and placards.
 To change the character models, use the project skill `.claude/skills/blender-pipeline/`.
 
 Run `run_tests.ps1` before every commit and `smoke_test.ps1` (lobby, `-FullGame`, and
@@ -70,7 +71,7 @@ adds new screens or launch flags.
 Layers, with dependencies pointing **downward only**:
 
 ```
-ui/, world/, meme/        presentation: read Session state, call Session methods, listen to signals
+ui/, world/, meme/, guess/ presentation: read Session state, call Session methods, listen to signals
         │
 autoload/App              scene flow (menu → lobby → room) driven by Session signals
 autoload/Session          RPC bridge: the ONLY place with @rpc functions; holds the client mirror
@@ -113,6 +114,13 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     Every client loads the pack from its own files (`IdentityPack.load_pack`, cached).
     `util/guess_auto_player.gd` is the guess bot (asks stock questions, answers them
     truthfully, filters, guesses).
+    In the room (`GameRoom.is_guess_mode()`), `world/room/GuessPresenter` and
+    `ui/hud/GuessHud` replace MatchPresenter/MatchHud, and the CRT runs a
+    `SearchStation` (`guess/terminal/SearchTerminal`: filters, clue log, ask pane, answer
+    bar, results with crossing out, GUESS). `CrtStation` is the shared base of
+    `MemeStation` and `SearchStation`; `ui/crt/CrtTheme` the shared phosphor look.
+    `IdentityPlacard` hangs over each head (`Seat.show_placard`). Both read a duck-typed
+    `source` (Session, or `PreviewGuessGame` for `--room-preview --mode=guess`).
     Tests: `test_guess_match.gd`, `test_guess_simulation.gd`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.
@@ -184,8 +192,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   `room/MatchPresenter` drives it from `MatchView`s: TV captions and memes, spotlight,
   camera views, the editor's lock and timer, muzzle flashes
   (`Seat.flash_shot`) and deaths (`PlayerAvatar.die`: puff, slump over the keyboard).
-  `MemeStation` (local seat only) puts the `MemeEditor` in a `SubViewport` that is the
-  picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
+  `MemeStation` (local seat only, a `CrtStation`) puts the `MemeEditor` in a `SubViewport`
+  that is the picture on the player's CRT. `crt/CrtZoom` glides the camera until the screen fills
   `FILL` of the view, then shows the same texture fullscreen through `crt_overlay.gdshader`
   and forwards input (`push_input`, mouse mapped through `CrtMonitor.curve_uv`, the same
   barrel curve as both shaders, so nothing jumps). Escape reverses it. The wall TV's

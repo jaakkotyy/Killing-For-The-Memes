@@ -30,8 +30,22 @@ func get_picture_root() -> SubViewport:
 func show_caption(title: String, subtitle: String = "") -> void:
 	_title.text = title
 	_subtitle.text = subtitle
+	# Questions and reveal lists can be long: smaller type instead of running off the screen.
+	var longest_line: int = 0
+	for line: String in title.split("\n"):
+		longest_line = maxi(longest_line, line.length())
+	_title.add_theme_font_size_override("font_size", 64 if longest_line <= 16 else (48 if longest_line <= 28 else 38))
+	var lines: int = subtitle.count("\n") + 1
+	_subtitle.add_theme_font_size_override("font_size", 30 if lines <= 3 and subtitle.length() <= 60 else 24)
 	_caption_box.visible = true
 	_meme.visible = false
+
+
+## The caption's title and subtitle ("" while a meme is showing).
+func get_caption() -> PackedStringArray:
+	if not _caption_box.visible:
+		return PackedStringArray(["", ""])
+	return PackedStringArray([_title.text, _subtitle.text])
 
 
 ## Shows a meme full screen (the spotlight phase).
@@ -59,6 +73,9 @@ func _build_picture() -> void:
 	_viewport.add_child(background)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Inset from the curved edges of the glass.
+	box.offset_left = 40
+	box.offset_right = -40
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_viewport.add_child(box)
 	_title = _label(64, Color(0.95, 0.25, 0.2))
@@ -76,6 +93,7 @@ func _build_picture() -> void:
 func _label(size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
 	return label

@@ -349,7 +349,7 @@ def build_movies() -> dict:
             _q("Am I part of a series or sequel?", "franchise", "is", True),
             _q("Did I win an Oscar?", "oscar", "is", True),
             _q("Am I from the United States?", "country", "is", "United States"),
-            *[_q(f"Am I a {genre} movie?", "genres", "has", genre) for genre in
+            *[_q(f"Am I {'an' if genre[0] in 'aeiou' else 'a'} {genre} movie?", "genres", "has", genre) for genre in
               ["comedy", "horror", "action", "science fiction", "fantasy", "romance", "drama", "crime", "war"]],
         ],
         "entries": entries,

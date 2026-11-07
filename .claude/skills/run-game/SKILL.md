@@ -49,8 +49,8 @@ a bad key. Check a key's presence with `[ -n "$GIPHY_API_KEY" ]`, never print it
 every instance must print `SMOKE_TEST PASS: guess game over after 2 rounds, ...` (fast
 rounds play 2). The logs show `[Session] Round n: DEAL/ASK/ANSWER/RESULT/REVEAL` and the
 bots' `[GuessBot] Guessing <name> (<n> candidates left)`; with 20-second test rounds most
-bots don't solve, which is fine. Until milestone G4 the room shows nothing of a guess
-game (it only listens to meme snapshots).
+bots don't solve, which is fine. The headless clients still build the guess room
+(GuessPresenter, GuessHud, SearchStation), so search their logs for `SCRIPT ERROR`.
 
 ### 2. Custom headless scenario
 
@@ -144,6 +144,26 @@ Done through the curve and Esc is `tests/unit/test_crt_zoom.gd`. A submitted mem
 sends it to the server instead, and the editor is locked outside the creation phase.
 After room or character changes, re-render the templates with `.\tools\capture_templates.ps1`
 and look at the JPGs in `assets/meme_templates/`.
+
+### 6b. Guess mode in the room (terminal, placards, HUD)
+
+```bash
+"$G" --path . --resolution 1280x720 --write-movie "C:/<scratchpad>/guess/f.png" --quit-after 60 -- --room-preview=5 --mode=guess [--pack=movies] --room-camera=editor
+```
+
+`--mode=guess` turns the preview into a local guess game (`PreviewGuessGame`): you are
+player 1 and ask first; the fake players ask random stock questions and answer them
+truthfully, but never guess. `--fast-rounds` uses the smoke test's short timers
+(answering starts around frame 190 at 60 fps). Correct frames:
+- `editor`: the phosphor terminal fills the screen: "MUSICIANS DATABASE", the count
+  "1263 → 1259 left" (the other players' identities are crossed out already), FILTERS /
+  CLUES / ASK tabs, field buttons with a value list and IS / IS NOT, the results in fame
+  order ("Michael Jackson 1958 · solo artist"), GUESS at the bottom right. From the first
+  ASK (~frame 310) the ASK pane shows "YOUR TURN" and the stock question list; while a fake
+  player's question is up, an answer bar (YES / NO / DON'T KNOW) sits above GUESS.
+- `overview`: a chained placard over every head with that player's identity, yours "???"
+  in red (green once solved); the HUD's top bar ("ROUND 1/3 ..."), scoreboard at the right.
+The automated checks are `tests/unit/test_search_terminal.gd` and `test_guess_room.gd`.
 
 ### 7. Recorded bot game (the round loop with your eyes)
 

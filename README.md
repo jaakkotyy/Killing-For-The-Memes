@@ -103,8 +103,11 @@ players, who flinch):
 & $env:GODOT --path . -- --room-preview=8 --room-camera=overview # or tv
 ```
 
-From your seat, press **E** or click your monitor to zoom into the meme editor; **Esc**
-looks up again. `--room-camera=editor` starts zoomed in. In debug builds: **Tab** cycles
+Add `--mode=guess [--pack=movies]` to play a local "Who Am I?" round instead: the fake
+players ask and answer stock questions, and your monitor is the identity database.
+
+From your seat, press **E** or click your monitor to zoom into the meme editor (or the
+database); **Esc** looks up again. `--room-camera=editor` starts zoomed in. In debug builds: **Tab** cycles
 the camera, **F** makes someone flinch, **G** moves the spotlight.
 
 The meme templates are rendered from the room itself. After changing the room or the
@@ -172,7 +175,7 @@ Pass these after `--` (e.g. `Godot.exe --path . -- --host`):
 | `--offline-templates` | Host only our own templates; don't fetch popular ones from Imgflip |
 | `--mode=<mode>` | The host's lobby starts in this mode: `memes` (default) or `guess` ("Who Am I?") |
 | `--pack=<id>` | Guess mode's identity pack, e.g. `musicians` (default) or `movies` (host) |
-| `--room-preview=<n>` | Open the 3D room directly with n fake players (no network) |
+| `--room-preview=<n>` | Open the 3D room directly with n fake players (no network); with `--mode=guess` a local guess game |
 | `--room-camera=<view>` | First room camera: `seat` (default), `tv`, `overview` or `editor` |
 
 ## Playing over the internet (before Steam)

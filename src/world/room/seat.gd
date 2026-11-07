@@ -24,6 +24,8 @@ var table_edge: float = 0.05
 var avatar: PlayerAvatar
 var monitor: CrtMonitor
 var drink: Node3D
+## Guess mode's sign over the player's head (made on first use).
+var placard: IdentityPlacard
 
 
 ## Builds everything. `look_index` picks the player's colours.
@@ -93,6 +95,22 @@ func flash_shot(target: Vector3) -> void:
 	tween.tween_property(flash, "light_energy", 0.0, 0.15)
 	tween.tween_interval(0.3)
 	tween.tween_callback(flash.queue_free)
+
+
+## Guess mode: shows [param text] on the sign over this player's head (made on first use).
+func show_placard(text: String, state: IdentityPlacard.State) -> void:
+	if placard == null:
+		placard = IdentityPlacard.new()
+		placard.name = "Placard"
+		placard.position = PlayerAvatar.metric_vector("seated_eyes") + Vector3(0, 0.66, -0.05)
+		add_child(placard)
+	placard.visible = true
+	placard.show_identity(text, state)
+
+
+func hide_placard() -> void:
+	if placard != null:
+		placard.visible = false
 
 
 ## Where a spotlight should aim to light this player.

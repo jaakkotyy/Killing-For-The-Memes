@@ -74,9 +74,18 @@ Same look, phosphor green, zoom and input hand-off as the meme editor (`CrtZoom`
   them from the clue log. Clicking a clue applies it as a filter.
 - **Results**: live count ("4,112 → 37 → 6") and a list with portrait, name and a few facts.
   Right-click strikes a candidate out (the Guess Who board feel); struck-out ones sink
-  to the bottom, greyed.
+  to the bottom, greyed. The identities on the other players' placards are struck out
+  for you (you can see them anyway).
 - **Ask / Guess**: a text box for your own question and the stock question list, and the Guess button
   with the selected candidate.
+- **Answer bar**: the HUD is hidden under the screen while you are zoomed in, so the
+  terminal shows the current question with YES / NO / DON'T KNOW too.
+
+As built in G4 (`src/guess/terminal/search_terminal.gd`, 800x600): the left column has
+FILTERS / CLUES / ASK tabs. A filter is a field button, a value from a list (with how many
+open candidates have it; years are listed by decade) and an operator (IS / IS NOT, HAS /
+HAS NOT, IN / NOT IN / BEFORE / FROM a decade). Your turn opens the ASK pane; a new
+answer switches to CLUES, whose FILTER button turns a clear stock answer into a filter.
 
 Search runs **locally**: the whole pack is public data, so the client filters it itself.
 Only the *assignment* is secret.
@@ -129,7 +138,7 @@ learns nothing it couldn't see on the placards anyway.
   a seeded full-game simulation (like `test_game_simulation.gd`).
 - [x] **G3 Wiring.** Mode and pack in `GameConfig`/`LobbyState`/lobby UI, `ServerController`
   and `Session` RPCs, protocol bump, bots, `smoke_test.ps1 -Mode guess` (both modes must pass).
-- **G4 Room.** `SearchStation` terminal, placards, wall TV question and tally, `GuessHud`,
+- [x] **G4 Room.** `SearchStation` terminal, placards, wall TV question and tally, `GuessHud`,
   `GuessPresenter` choreography (spotlight on the asker, reveals at round end), `--room-preview` support.
 - **G5 Polish.** Portraits, more packs, custom "Our friends" pack, sounds, tuning from playtests.
 
@@ -138,6 +147,9 @@ learns nothing it couldn't see on the placards anyway.
 - You can't see your own identity; everyone else can (2026-11-07).
 - No liar role.
 - Points over a fixed number of rounds; nobody dies in this mode.
+- The terminal is a view on the CRT; it searches the pack locally and only emits what
+  the player wants to do (`ask_requested`, `stock_requested`, `answer_requested`,
+  `guess_requested`), which GuessPresenter sends to Session (2026-11-07).
 - Questions are always answered by the players (Yes / No / I don't know), never by the
   server. Players type their own or pick a stock question; stock questions carry a
   database filter the terminal can offer.

@@ -6,7 +6,11 @@ extends Node3D
 ## camera, shots, deaths) and a MatchHud shows timers, voting and the win screen.
 ## The local player's MemeStation puts the meme editor on their CRT.
 ##
-## `--room-preview=<n>` opens this scene directly with n fake players (no network).
+## In guess mode ("Who Am I?", Session.lobby.mode) a GuessPresenter, GuessHud and a
+## SearchStation (the identity database on the CRT) take their place.
+##
+## `--room-preview=<n>` opens this scene directly with n fake players (no network); with
+## `--mode=guess [--pack=<id>]` it runs a local guess game (PreviewGuessGame).
 
 enum View { SEAT, TV, OVERVIEW }
 
@@ -32,9 +36,11 @@ var _spotlight_player: int = 0
 var _lamp: OmniLight3D
 var _lamp_time: float = 0.0
 var _tv: WallTv
-var _station: MemeStation
-var _presenter: MatchPresenter
+var _station: CrtStation
+var _presenter: Node
 var _match_hud: MatchHud
+var _guess_hud: GuessHud
+var _preview_game: PreviewGuessGame
 ## Whether the local player may open the meme editor now (the presenter allows it during
 ## creation only; the preview always does).
 var _editing_allowed: bool = true
@@ -42,6 +48,8 @@ var _editing_allowed: bool = true
 var demo_enabled: bool = true
 ## Fake players for a preview room; -1 means use the --room-preview launch flag.
 var preview_players: int = -1
+## A preview room's game mode; "" means use the --mode launch flag.
+var preview_mode: String = ""
 
 @onready var _camera: CameraRig = %CameraRig
 @onready var _spotlight: SpotLight3D = %Spotlight
@@ -65,17 +73,23 @@ func _ready() -> void:
 
 	_leave_button.pressed.connect(_on_leave_pressed)
 	if _is_preview():
-		if demo_enabled:
+		if is_guess_mode():
+			_start_preview_guess(players)
+		elif demo_enabled:
 			_start_demo()
 		_set_view(_initial_view(), 0.0)
 	else:
 		Session.lobby_updated.connect(_on_lobby_updated)
 		_set_view(_initial_view(), 0.0)
-		_match_hud = HUD_SCENE.instantiate()
-		add_child(_match_hud)
-		_presenter = MatchPresenter.new()
-		add_child(_presenter)
-		_presenter.setup(self)
+		if is_guess_mode():
+			_build_guess_presentation(Session)
+		else:
+			_match_hud = HUD_SCENE.instantiate()
+			add_child(_match_hud)
+			var presenter := MatchPresenter.new()
+			add_child(presenter)
+			presenter.setup(self)
+			_presenter = presenter
 	if _station != null and App.options != null and App.options.room_camera == "editor":
 		_station.open(true)
 
@@ -87,17 +101,62 @@ func _build_station() -> void:
 	var seat: Seat = _seats.get(_local_id) as Seat
 	if seat == null:
 		return
-	_station = MemeStation.new()
-	add_child(_station)
-	_station.setup(_camera, seat)
+	if is_guess_mode():
+		var search := SearchStation.new()
+		add_child(search)
+		search.setup(_camera, seat, _guess_pack())
+		_station = search
+		_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
+		return
+	var meme := MemeStation.new()
+	add_child(meme)
+	meme.setup(_camera, seat)
+	_station = meme
 	_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
 	if not _is_preview():
 		return
 	var file := FileAccess.open("res://data/prompts/default.json", FileAccess.READ)
 	var deck: PromptDeck = PromptDeck.from_json(file.get_as_text() if file != null else "")
-	_station.editor.set_prompt(deck.draw() if deck != null else tr("Make a meme!"))
-	_station.editor.set_time_left(GameConfig.new().create_duration)
-	_station.meme_submitted.connect(_on_preview_meme_submitted)
+	meme.editor.set_prompt(deck.draw() if deck != null else tr("Make a meme!"))
+	meme.editor.set_time_left(GameConfig.new().create_duration)
+	meme.meme_submitted.connect(_on_preview_meme_submitted)
+
+
+## Guess mode's presenter and HUD, fed by [param source] (Session or the preview game).
+func _build_guess_presentation(source: Object) -> void:
+	_guess_hud = GuessHud.new(source)
+	add_child(_guess_hud)
+	var presenter := GuessPresenter.new()
+	add_child(presenter)
+	presenter.setup(self, source)
+	_presenter = presenter
+
+
+## Preview only: a local guess game where the fake players never ask or answer.
+func _start_preview_guess(players: Array[LobbyPlayer]) -> void:
+	_preview_game = PreviewGuessGame.new()
+	add_child(_preview_game)
+	var fast: bool = App.options != null and App.options.fast_rounds
+	_preview_game.setup(players, _guess_pack(), App.fast_config() if fast else null)
+	_build_guess_presentation(_preview_game)
+
+
+## Whether this room plays guess mode ("Who Am I?") instead of the meme game.
+func is_guess_mode() -> bool:
+	if _is_preview():
+		var mode: String = preview_mode
+		if mode.is_empty() and App.options != null:
+			mode = App.options.mode
+		return mode == GameMode.GUESS
+	return Session.lobby.mode == GameMode.GUESS
+
+
+func _guess_pack() -> IdentityPack:
+	if not _is_preview():
+		return Session.guess_pack()
+	var pack_id: String = App.options.pack if App.options != null and not App.options.pack.is_empty() else "musicians"
+	var pack: IdentityPack = IdentityPack.load_pack(pack_id)
+	return pack if pack != null else IdentityPack.load_pack("musicians")
 
 
 func _on_preview_meme_submitted(spec: MemeSpec) -> void:
@@ -143,9 +202,23 @@ func get_local_id() -> int:
 	return _local_id
 
 
-## The local player's meme station, or null when they have no seat.
+## The local player's meme station, or null when they have no seat (or in guess mode).
 func get_station() -> MemeStation:
-	return _station
+	return _station as MemeStation
+
+
+## The local player's guess-mode terminal, or null when they have no seat (or in meme mode).
+func get_search_station() -> SearchStation:
+	return _station as SearchStation
+
+
+func get_guess_hud() -> GuessHud:
+	return _guess_hud
+
+
+## The local guess game of `--room-preview --mode=guess`, or null.
+func get_preview_game() -> PreviewGuessGame:
+	return _preview_game
 
 
 func get_match_hud() -> MatchHud:
@@ -162,7 +235,8 @@ func get_view() -> View:
 	return _view
 
 
-## Allows or forbids opening the meme editor; forbidding closes it if it is open.
+## Allows or forbids opening the CRT (meme editor or search terminal); forbidding closes
+## it if it is open.
 func set_editing_allowed(allowed: bool) -> void:
 	_editing_allowed = allowed
 	if _station != null:
@@ -198,7 +272,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	# The demo keys would fight the presenter in a real game.
-	if not OS.is_debug_build() or not _is_preview():
+	if not OS.is_debug_build() or not _is_preview() or _preview_game != null:
 		return
 	match key:
 		KEY_F:
@@ -240,9 +314,10 @@ func _update_hint() -> void:
 		parts.append(tr("Esc: look up"))
 	else:
 		if _station != null and _editing_allowed and _view == View.SEAT:
-			parts.append(tr("E or click your monitor: make a meme"))
+			parts.append(tr("E or click your monitor: search the database") if _station is SearchStation
+				else tr("E or click your monitor: make a meme"))
 		parts.append(tr("Tab: camera"))
-		if OS.is_debug_build() and _is_preview():
+		if OS.is_debug_build() and _is_preview() and _preview_game == null:
 			parts.append(tr("Dev keys: F flinch · G spotlight"))
 	_hint_label.text = "   ·   ".join(parts)
 

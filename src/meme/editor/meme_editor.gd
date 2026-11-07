@@ -18,9 +18,9 @@ signal search_requested(query: String)
 ## Emitted once when the countdown reaches zero, after the automatic submit.
 signal time_ran_out
 
-const PHOSPHOR: Color = Color(0.45, 1.0, 0.62)
-const PHOSPHOR_DIM: Color = Color(0.2, 0.5, 0.3)
-const SCREEN_BG: Color = Color(0.02, 0.06, 0.04)
+const PHOSPHOR: Color = CrtTheme.PHOSPHOR
+const PHOSPHOR_DIM: Color = CrtTheme.PHOSPHOR_DIM
+const SCREEN_BG: Color = CrtTheme.SCREEN_BG
 const THUMB_SIZE: Vector2i = Vector2i(104, 78)
 
 ## Which templates the list shows.
@@ -353,44 +353,6 @@ func _update_status() -> void:
 		_done_button.text = tr("RESUBMIT")
 
 
-## Green-phosphor terminal look; built in code so it stays in one place with the colours.
+## Green-phosphor terminal look (shared with the guess terminal).
 func _build_theme() -> Theme:
-	var built := Theme.new()
-	built.default_font_size = 22
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = SCREEN_BG.lightened(0.04)
-	panel.border_color = PHOSPHOR_DIM
-	panel.set_border_width_all(2)
-	panel.set_content_margin_all(8)
-	var focus := panel.duplicate() as StyleBoxFlat
-	focus.border_color = PHOSPHOR
-	var button := panel.duplicate() as StyleBoxFlat
-	button.bg_color = PHOSPHOR_DIM.darkened(0.3)
-	var button_hover := button.duplicate() as StyleBoxFlat
-	button_hover.bg_color = PHOSPHOR_DIM
-	button_hover.border_color = PHOSPHOR
-	var selected := panel.duplicate() as StyleBoxFlat
-	selected.bg_color = PHOSPHOR_DIM.darkened(0.2)
-	selected.border_color = PHOSPHOR
-	for type: String in ["LineEdit", "ItemList"]:
-		built.set_stylebox("normal", type, panel)
-		built.set_stylebox("focus", type, focus)
-		built.set_stylebox("panel", type, panel)
-	built.set_stylebox("normal", "Button", button)
-	built.set_stylebox("hover", "Button", button_hover)
-	built.set_stylebox("pressed", "Button", selected)
-	built.set_stylebox("focus", "Button", focus)
-	built.set_stylebox("selected", "ItemList", selected)
-	built.set_stylebox("selected_focus", "ItemList", selected)
-	built.set_stylebox("hovered", "ItemList", button_hover)
-	for type: String in ["Label", "LineEdit", "Button", "ItemList"]:
-		built.set_color("font_color", type, PHOSPHOR)
-	built.set_color("font_placeholder_color", "LineEdit", PHOSPHOR_DIM)
-	built.set_color("caret_color", "LineEdit", PHOSPHOR)
-	built.set_color("font_hover_color", "Button", Color.WHITE)
-	built.set_color("font_selected_color", "ItemList", Color.WHITE)
-	built.set_color("font_hovered_color", "ItemList", Color.WHITE)
-	built.set_constant("icon_margin", "ItemList", 10)
-	built.set_constant("v_separation", "ItemList", 6)
-	built.set_font_size("font_size", "ItemList", 14)
-	return built
+	return CrtTheme.build()
