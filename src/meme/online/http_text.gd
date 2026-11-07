@@ -6,7 +6,9 @@ extends RefCounted
 
 signal _all_done
 
-const USER_AGENT: String = "KillingForTheMemes/0.1 (private party game)"
+## Wikimedia's User-Agent policy wants a way to reach whoever runs the client; without
+## it, Commons answers 429 to new thumbnails. The project's public repository is that contact.
+const USER_AGENT: String = "KillingForTheMemes/0.1 (https://github.com/jaakkotyy/Killing-For-The-Memes) Godot/4.7"
 const DEFAULT_TIMEOUT: float = 8.0
 const MAX_BYTES: int = 2 * 1024 * 1024
 

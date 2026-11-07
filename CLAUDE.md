@@ -118,8 +118,8 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
     as `pack_text` in `_rpc_game_started` (protocol 8) and clients validate them with
     `IdentityPack.receive()`; `forget_received()` on leaving. `Portrait.url_for()` rebuilds
     a Commons thumbnail URL from an entry's `image`; the terminal and placards show it via
-    `TemplateImageCache` when `App.online_images_allowed()` (Wikimedia currently rate-limits
-    us with 429s, so expect them to fail gracefully).
+    `TemplateImageCache` when `App.online_images_allowed()`. Wikimedia answers 429 unless the
+    User-Agent (`HttpText.USER_AGENT`) carries a contact, which is the public repo URL.
     `util/guess_auto_player.gd` is the guess bot (asks stock questions, answers them
     truthfully, filters, guesses).
     In the room (`GameRoom.is_guess_mode()`), `world/room/GuessPresenter` and
