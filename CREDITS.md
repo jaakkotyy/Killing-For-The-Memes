@@ -61,6 +61,15 @@ shows the words for now. **Before a commercial release**, either clear their use
 terms and the images' rights holders) or switch the source off or to a licensed provider
 (`src/meme/online/online_template_source.gd`).
 
+## Data
+
+| Name | Author | License | Source | Path |
+|---|---|---|---|---|
+| Guess mode identity packs (musicians, movies: names, years, countries, genres, directors, awards, sitelink counts) | Wikidata contributors | CC0 1.0 (public domain) | https://www.wikidata.org, built by `tools/build_identities.py` | `data/identities/*.json` |
+
+The packs store Wikimedia Commons file names for portraits but no images; each Commons
+file has its own license, so portraits (if used) are fetched at run time and not shipped.
+
 ## Audio
 
 | Name | Author | License | Source | Path |

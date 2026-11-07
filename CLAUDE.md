@@ -46,6 +46,7 @@ A second mode is planned: "Who Am I?" guessing with a database search terminal
 .\tools\build_windows.ps1 [-Debug]   # export builds/windows/KillingForTheMemes.exe
 .\tools\build_models.ps1 [-SkipBake] [-PropsOnly] # Blender sources -> assets/models/** (docs/ASSET_PIPELINE.md)
 .\tools\capture_templates.ps1        # re-render the meme templates from the room (opens a window)
+.\tools\build_identities.ps1         # rebuild guess mode's identity packs from Wikidata (Python, internet)
 ```
 
 To look at the 3D room without networking: `--room-preview=<n> [--room-camera=seat|tv|overview|editor]`
@@ -94,6 +95,12 @@ Autoload order: `Settings`, `Platform`, `Net`, `Session`, `App`.
   - `MatchView`: a client's parsed snapshot plus the client-side copies of the vote/shoot
     rules. The presentation diffs a view against the previous one to find shots, deaths
     and new spotlights, so the server sends no separate events.
+  - `guess/`: guess mode's database (`docs/GUESS_MODE.md`). `IdentityPack` loads and
+    validates `data/identities/<pack>.json` (typed fields, entries, stock questions),
+    `IdentityFilter` is one condition (an unknown value never crosses an entry out;
+    `negated()` is what a "No" means), `IdentityQuery` is a terminal search (filters,
+    name text, struck-out candidates, fame order), `IdentityDeck` deals distinct
+    identities from the best known `pool_size`.
   - Test style: `tests/unit/test_game_match.gd` for rules, `test_game_simulation.gd` for
     seeded random full games with invariant checks. Add both kinds for new rules.
 - **`src/net/`** — `NetTransport` base class with `EnetTransport` now and `SteamTransport`

@@ -17,3 +17,6 @@ Thumbs.db
 *.tmp
 .vscode/
 .idea/
+
+# Raw Wikidata answers cached by tools/build_identities.py
+.identity_cache/
