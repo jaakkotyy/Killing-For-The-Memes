@@ -1,8 +1,7 @@
 class_name GuessHud
 extends CanvasLayer
-## Guess mode's overlay in the room (MatchHud's counterpart): round, whose turn it is, the
-## phase and round clocks, your score, the scoreboard, the question with Yes / No /
-## I don't know (keys 1, 2, 3; press your answer again to change it), the round's reveal
+## The overlay in the room: round, whose turn it is, the phase and round clocks, your
+## score, the scoreboard, the question with Yes / No / I don't know (keys 1, 2, 3; press your answer again to change it), the round's reveal
 ## and the final standings. A view over GuessViews from [member source] (Session, or the
 ## preview's stand-in); every action goes through it.
 ##
@@ -411,7 +410,7 @@ func _overlay_label(size: int, height: float) -> Label:
 	return label
 
 
-## Same look as MatchHud: dark translucent panels, outlined text over the dim room.
+## Dark translucent panels, outlined text over the dim room.
 func _build_theme() -> Theme:
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.04, 0.03, 0.03, 0.78)

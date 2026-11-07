@@ -1,6 +1,6 @@
 class_name IdentityPlacard
 extends Node3D
-## Guess mode's sign over a player's head, hanging from two chains: everyone else's shows
+## The sign over a player's head, hanging from two chains: everyone else's shows
 ## their secret identity, your own shows "???" until you solve it. It turns to face the
 ## camera around its chains, so everyone at the table can read it. With a portrait URL
 ## (Portrait.url_for) the picture hangs above the name once it has downloaded.
@@ -99,7 +99,7 @@ func _update_picture() -> void:
 	_picture.visible = false
 	if image_url.is_empty():
 		return
-	var cache: TemplateImageCache = TemplateImageCache.get_instance()
+	var cache: PortraitCache = PortraitCache.get_instance()
 	if not cache.loaded.is_connected(_on_image_loaded):
 		cache.loaded.connect(_on_image_loaded)
 	var texture: Texture2D = cache.get_texture(image_url)

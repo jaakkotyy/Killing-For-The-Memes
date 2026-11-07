@@ -1,7 +1,7 @@
 class_name SearchTerminal
 extends Control
-## Guess mode's database terminal on the player's CRT (800x600, inside a SubViewport, same
-## phosphor look as the meme editor). Search the identity pack for who you might be:
+## The database terminal on the player's CRT (800x600, inside a SubViewport, in the
+## phosphor look of CrtTheme). Search the identity pack for who you might be:
 ##
 ## - FILTERS: pick a field, a value and an operator ("Born before 1970", "Genres: rock").
 ## - CLUES: the answers to your questions this round; a clear answer to a stock question
@@ -91,10 +91,12 @@ var _answer_buttons: Dictionary = {}  # GuessMatch.Answer -> Button
 
 func _ready() -> void:
 	theme = CrtTheme.build()
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# Inside a SubViewport the anchors have no parent Control to follow.
-	if not get_parent() is Control:
-		set_deferred("size", Vector2(get_viewport_rect().size))
+	if get_parent() is Control:
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	else:
+		# Inside a SubViewport the anchors have no parent Control to follow: fill it by size.
+		set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		size = Vector2(get_viewport_rect().size)
 	_build()
 	show_pane(Pane.FILTERS)
 	_refresh_all()
@@ -279,7 +281,7 @@ func add_built_filter(value_index: int, op: String) -> void:
 
 
 func ask_own(text: String) -> void:
-	var clean: String = MemeSpec.sanitize_caption(text).substr(0, QUESTION_MAX_LENGTH)
+	var clean: String = GuessMatch.sanitize_question(text).substr(0, QUESTION_MAX_LENGTH)
 	if clean.is_empty() or _view == null or not _view.can_ask(_me):
 		return
 	_own_edit.text = ""
@@ -437,7 +439,7 @@ func _show_portrait(entry: IdentityPack.Entry) -> void:
 	_portrait.visible = not url.is_empty()
 	if url.is_empty():
 		return
-	var cache: TemplateImageCache = TemplateImageCache.get_instance()
+	var cache: PortraitCache = PortraitCache.get_instance()
 	if not cache.loaded.is_connected(_on_portrait_loaded):
 		cache.loaded.connect(_on_portrait_loaded)
 		cache.failed.connect(_on_portrait_failed)

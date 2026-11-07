@@ -1,11 +1,11 @@
 class_name GuessPresenter
 extends Node
-## Guess mode's MatchPresenter: turns GuessViews into what happens in the room. The wall
+## Turns GuessViews into what happens in the room. The wall
 ## TV shows the category, the question and its answer; the spotlight follows the asker;
 ## placards show everyone's identity except your own; the CRT runs the SearchTerminal;
 ## solvers stand up and wave, wrong guessers flinch, and the winners celebrate.
 ##
-## Like MatchPresenter it only reads views and calls room methods, and works out events by
+## It only reads views and calls room methods, and works out events by
 ## diffing the new view with the previous one. Views come from [member source]: Session
 ## in a real game, a PreviewGuessGame in `--room-preview --mode=guess`. Anything with the
 ## same signal and methods works.

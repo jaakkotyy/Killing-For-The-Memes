@@ -1,5 +1,5 @@
 extends Node
-## Development bot for guess mode (--auto-play, next to AutoPlayer): plays the local
+## Development bot (--auto-play): plays the local
 ## player's turns through the public Session API, like the terminal UI will.
 ##
 ## It asks the pack's stock questions it hasn't asked yet (now and then its own), answers

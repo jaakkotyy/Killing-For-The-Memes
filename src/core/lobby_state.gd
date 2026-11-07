@@ -12,9 +12,8 @@ const DEFAULT_NAME: String = "Player"
 var max_players: int
 ## True once the host has started the game; the lobby then accepts no changes.
 var started: bool = false
-## What the next game will be (a GameMode), chosen by the host.
-var mode: String = GameMode.MEMES
-## Guess mode's identity pack id (data/identities/<pack>.json).
+## The next game's identity pack id (data/identities/<pack>.json or a custom pack),
+## chosen by the host.
 var pack: String = "musicians"
 
 var _players: Dictionary[int, LobbyPlayer] = {}
@@ -97,14 +96,12 @@ func to_dict() -> Dictionary:
 	var players: Array[Dictionary] = []
 	for player: LobbyPlayer in get_players():
 		players.append(player.to_dict())
-	return {"max_players": max_players, "started": started, "mode": mode, "pack": pack, "players": players}
+	return {"max_players": max_players, "started": started, "pack": pack, "players": players}
 
 
 static func from_dict(data: Dictionary) -> LobbyState:
 	var state := LobbyState.new(int(data.get("max_players", 8)))
 	state.started = bool(data.get("started", false))
-	var mode_value: Variant = data.get("mode", GameMode.MEMES)
-	state.mode = mode_value if GameMode.is_valid(mode_value) else GameMode.MEMES
 	state.pack = str(data.get("pack", state.pack))
 	for entry: Variant in data.get("players", []):
 		if entry is Dictionary:

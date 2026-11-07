@@ -3,7 +3,7 @@ extends Node
 ## The local player's CRT setup: a 2D screen (a Control) lives in a SubViewport that is the
 ## picture on their own monitor, and CrtZoom moves the camera into it and back. Open it
 ## with E or by clicking the monitor from the seat view; Escape returns to the seat.
-## MemeStation puts the meme editor on it, SearchStation guess mode's database terminal.
+## SearchStation puts the database terminal on it.
 
 ## True after zooming in, false after zooming back out.
 signal open_changed(is_open: bool)

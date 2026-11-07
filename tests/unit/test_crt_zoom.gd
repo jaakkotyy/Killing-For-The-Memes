@@ -1,6 +1,6 @@
 extends GutTest
 ## The CRT curve shared by the screen shaders and the mouse mapping, and the zoom + input
-## hand-off running inside a real preview room.
+## hand-off running inside a real preview room (the search terminal on your CRT).
 
 const ROOM_SCENE: PackedScene = preload("res://src/world/room/room.tscn")
 
@@ -26,40 +26,34 @@ func test_curve_is_monotonic_across_the_screen() -> void:
 		previous = x
 
 
-func test_zooming_in_hands_keyboard_and_mouse_to_the_editor() -> void:
-	var room: Node3D = ROOM_SCENE.instantiate()
-	room.set("preview_players", 3)
-	room.set("demo_enabled", false)
+func test_zooming_in_hands_keyboard_and_mouse_to_the_terminal() -> void:
+	PortraitCache.offline = true
+	var room: GameRoom = ROOM_SCENE.instantiate()
+	room.preview_players = 3
 	add_child_autofree(room)
 	await wait_physics_frames(2)
-	var station: MemeStation = _find_station(room)
-	assert_not_null(station, "the local player gets a meme station")
+	var station: SearchStation = room.get_search_station()
+	assert_not_null(station, "the local player gets the search terminal")
 
 	station.open(true)
 	await wait_physics_frames(2)
 	assert_true(station.zoom.is_zoomed_in())
 
-	for letter: String in "HELLO":
-		_press(KEY_A + (letter.unicode_at(0) - "A".unicode_at(0)), letter.unicode_at(0))
-	assert_eq(station.editor.get_draft().top_text, "HELLO", "typing reaches the focused caption")
+	for letter: String in "AB":
+		_press(KEY_A + (letter.unicode_at(0) - "A".unicode_at(0)), letter.unicode_at(0) + 32)
+	# The search box, or the question box when it is your turn to ask.
+	var focused: LineEdit = station.terminal.get_viewport().gui_get_focus_owner() as LineEdit
+	assert_not_null(focused, "zooming in focuses a text field")
+	if focused != null:
+		assert_eq(focused.text, "ab", "typing reaches the focused field")
 
-	watch_signals(station.editor)
-	var done: Button = station.editor.find_child("DoneButton", true, false) as Button
-	var target: Vector2 = done.get_global_rect().get_center()
-	var window_point: Variant = _window_point_for(station.zoom, target)
-	assert_not_null(window_point, "the Done button is reachable through the curve")
-	_click(window_point)
-	assert_signal_emitted(station.editor, "submitted", "clicking Done through the overlay submits")
+	var guess: Button = station.terminal.find_child("GuessButton", true, false) as Button
+	var target: Vector2 = guess.get_global_rect().get_center()
+	assert_not_null(_window_point_for(station.zoom, target), "the GUESS button is reachable through the curve")
 
 	_press(KEY_ESCAPE, 0)
 	assert_eq(station.zoom.state, CrtZoom.State.ZOOMING_OUT, "Escape zooms back out")
-
-
-func _find_station(room: Node) -> MemeStation:
-	for child: Node in room.get_children():
-		if child is MemeStation:
-			return child
-	return null
+	PortraitCache.offline = false
 
 
 func _press(keycode: Key, unicode: int) -> void:

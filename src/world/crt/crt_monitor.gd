@@ -1,7 +1,7 @@
 class_name CrtMonitor
 extends Node3D
-## A chunky old CRT monitor (greybox). Its screen is a quad with `crt_screen.gdshader`;
-## M4 feeds the meme editor's SubViewport into it with `set_picture()`.
+## A chunky old CRT monitor (greybox). Its screen is a quad with `crt_screen.gdshader`.
+## The search terminal's SubViewport is fed into it with `set_picture()`.
 ##
 ## The origin is the bottom centre of the case; the screen faces +Z.
 

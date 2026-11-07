@@ -1,6 +1,6 @@
 class_name SearchStation
 extends CrtStation
-## Guess mode's CRT: the SearchTerminal (the identity database) on the local player's monitor.
+## The local player's CRT: the SearchTerminal (the identity database).
 
 var terminal: SearchTerminal
 

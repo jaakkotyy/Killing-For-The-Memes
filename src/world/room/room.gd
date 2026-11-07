@@ -1,55 +1,50 @@
 class_name GameRoom
 extends Node3D
-## The 3D room: a round table with one seat per player, the wall TV, a flickering lamp and
-## a spotlight. Reads players from the Session mirror and never changes game state
-## itself. In a real game a MatchPresenter drives it from match snapshots (TV, spotlight,
-## camera, shots, deaths) and a MatchHud shows timers, voting and the win screen.
-## The local player's MemeStation puts the meme editor on their CRT.
+## The scene of the game: a round platform floating in deep space (SpaceBackdrop: stars,
+## a sun, the artist's two planets), with a round table and one seat per player, the big
+## screen on its pylon at the open side, and a softly glowing orb hovering over the table.
+## Reads players from the Session mirror and never changes game state itself. A
+## GuessPresenter drives it from match snapshots (screen, spotlight, camera, placards),
+## a GuessHud shows timers, answers and standings, and the local player's SearchStation
+## puts the identity database on their CRT.
 ##
-## In guess mode ("Who Am I?", Session.lobby.mode) a GuessPresenter, GuessHud and a
-## SearchStation (the identity database on the CRT) take their place.
-##
-## `--room-preview=<n>` opens this scene directly with n fake players (no network); with
-## `--mode=guess [--pack=<id>]` it runs a local guess game (PreviewGuessGame).
+## `--room-preview=<n> [--pack=<id>]` opens this scene directly with n fake players and a
+## local game (PreviewGuessGame), no network.
 
 enum View { SEAT, TV, OVERVIEW }
 
 const TV_SCENE: PackedScene = preload("res://src/world/wall_tv/wall_tv.tscn")
-const HUD_SCENE: PackedScene = preload("res://src/ui/hud/match_hud.tscn")
 
-const ROOM_HALF_SIZE: float = 5.0
-const CEILING_HEIGHT: float = 3.4
+## The platform's deck: the table and seats in the middle, space all around.
+const PLATFORM_RADIUS: float = 5.2
+const PLATFORM_THICKNESS: float = 0.32
 const SEAT_RADIUS: float = 2.1
-const TV_POSITION: Vector3 = Vector3(0.0, 2.05, -ROOM_HALF_SIZE + 0.42)
-# Off-centre so the lamp shade doesn't hide the TV.
+const TV_POSITION: Vector3 = Vector3(0.0, 2.05, -4.58)
+const ORB_HEIGHT: float = 2.45
+# Off-centre so the orb doesn't hide the screen.
 const OVERVIEW_EYE: Vector3 = Vector3(2.7, 2.9, 3.9)
 const OVERVIEW_TARGET: Vector3 = Vector3(-0.2, 0.8, -0.9)
 const CAMERA_GLIDE_SECONDS: float = 0.9
-## Narrow enough that a meme on the wall TV is readable from any seat.
+## Narrow enough that the screen is readable from any seat.
 const TV_VIEW_FOV: float = 32.0
-const DEMO_STEP_SECONDS: float = 3.0
 
 var _seats: Dictionary = {}  # player id -> Seat
 var _local_id: int = 0
 var _view: View = View.SEAT
 var _spotlight_player: int = 0
-var _lamp: OmniLight3D
-var _lamp_time: float = 0.0
+var _orb: Node3D
+var _orb_light: OmniLight3D
+var _time: float = 0.0
 var _tv: WallTv
-var _station: CrtStation
-var _presenter: Node
-var _match_hud: MatchHud
+var _backdrop: SpaceBackdrop
+var _station: SearchStation
+var _presenter: GuessPresenter
 var _guess_hud: GuessHud
 var _preview_game: PreviewGuessGame
-## Whether the local player may open the meme editor now (the presenter allows it during
-## creation only; the preview always does).
+## Whether the local player may open the terminal now (the presenter decides).
 var _editing_allowed: bool = true
-## Set false before adding the room to stop the preview's spotlight demo (staged shots).
-var demo_enabled: bool = true
 ## Fake players for a preview room; -1 means use the --room-preview launch flag.
 var preview_players: int = -1
-## A preview room's game mode; "" means use the --mode launch flag.
-var preview_mode: String = ""
 
 @onready var _camera: CameraRig = %CameraRig
 @onready var _spotlight: SpotLight3D = %Spotlight
@@ -58,12 +53,13 @@ var preview_mode: String = ""
 
 
 func _ready() -> void:
-	_build_environment()
-	_build_shell()
+	_build_space()
+	_build_platform()
 	_build_table()
-	_build_lamp()
+	_build_orb()
 	_tv = TV_SCENE.instantiate()
 	_tv.position = TV_POSITION
+	_tv.pylon_height = TV_POSITION.y
 	add_child(_tv)
 
 	var players: Array[LobbyPlayer] = _players()
@@ -73,85 +69,45 @@ func _ready() -> void:
 
 	_leave_button.pressed.connect(_on_leave_pressed)
 	if _is_preview():
-		if is_guess_mode():
-			_start_preview_guess(players)
-		elif demo_enabled:
-			_start_demo()
-		_set_view(_initial_view(), 0.0)
+		_start_preview(players)
 	else:
 		Session.lobby_updated.connect(_on_lobby_updated)
-		_set_view(_initial_view(), 0.0)
-		if is_guess_mode():
-			_build_guess_presentation(Session)
-		else:
-			_match_hud = HUD_SCENE.instantiate()
-			add_child(_match_hud)
-			var presenter := MatchPresenter.new()
-			add_child(presenter)
-			presenter.setup(self)
-			_presenter = presenter
+		_build_presentation(Session)
+	_set_view(_initial_view(), 0.0)
 	if _station != null and App.options != null and App.options.room_camera == "editor":
 		_station.open(true)
 
 
-## The local player's editor and CRT zoom. In a real game the presenter sets the prompt
-## and the countdown and sends submissions to the server; the preview uses a local prompt
-## and only shows a submitted meme on the wall TV.
+## The local player's terminal and CRT zoom.
 func _build_station() -> void:
 	var seat: Seat = _seats.get(_local_id) as Seat
 	if seat == null:
 		return
-	if is_guess_mode():
-		var search := SearchStation.new()
-		add_child(search)
-		search.setup(_camera, seat, _guess_pack())
-		_station = search
-		_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
-		return
-	var meme := MemeStation.new()
-	add_child(meme)
-	meme.setup(_camera, seat)
-	_station = meme
+	_station = SearchStation.new()
+	add_child(_station)
+	_station.setup(_camera, seat, _pack())
 	_station.open_changed.connect(func(_open: bool) -> void: _update_hint())
-	if not _is_preview():
-		return
-	var file := FileAccess.open("res://data/prompts/default.json", FileAccess.READ)
-	var deck: PromptDeck = PromptDeck.from_json(file.get_as_text() if file != null else "")
-	meme.editor.set_prompt(deck.draw() if deck != null else tr("Make a meme!"))
-	meme.editor.set_time_left(GameConfig.new().create_duration)
-	meme.meme_submitted.connect(_on_preview_meme_submitted)
 
 
-## Guess mode's presenter and HUD, fed by [param source] (Session or the preview game).
-func _build_guess_presentation(source: Object) -> void:
+## The presenter and HUD, fed by [param source] (Session or the preview game).
+func _build_presentation(source: Object) -> void:
 	_guess_hud = GuessHud.new(source)
 	add_child(_guess_hud)
-	var presenter := GuessPresenter.new()
-	add_child(presenter)
-	presenter.setup(self, source)
-	_presenter = presenter
+	_presenter = GuessPresenter.new()
+	add_child(_presenter)
+	_presenter.setup(self, source)
 
 
-## Preview only: a local guess game where the fake players never ask or answer.
-func _start_preview_guess(players: Array[LobbyPlayer]) -> void:
+## Preview only: a local game where the fake players ask stock questions and answer them.
+func _start_preview(players: Array[LobbyPlayer]) -> void:
 	_preview_game = PreviewGuessGame.new()
 	add_child(_preview_game)
 	var fast: bool = App.options != null and App.options.fast_rounds
-	_preview_game.setup(players, _guess_pack(), App.fast_config() if fast else null)
-	_build_guess_presentation(_preview_game)
+	_preview_game.setup(players, _pack(), App.fast_config() if fast else null)
+	_build_presentation(_preview_game)
 
 
-## Whether this room plays guess mode ("Who Am I?") instead of the meme game.
-func is_guess_mode() -> bool:
-	if _is_preview():
-		var mode: String = preview_mode
-		if mode.is_empty() and App.options != null:
-			mode = App.options.mode
-		return mode == GameMode.GUESS
-	return Session.lobby.mode == GameMode.GUESS
-
-
-func _guess_pack() -> IdentityPack:
+func _pack() -> IdentityPack:
 	if not _is_preview():
 		return Session.guess_pack()
 	var pack_id: String = App.options.pack if App.options != null and not App.options.pack.is_empty() else "musicians"
@@ -159,33 +115,7 @@ func _guess_pack() -> IdentityPack:
 	return pack if pack != null else IdentityPack.load_pack("musicians")
 
 
-func _on_preview_meme_submitted(spec: MemeSpec) -> void:
-	print("[Room] Meme submitted: %s" % spec.to_dict())
-	_tv.show_meme(spec)
-
-
-## Preview only: the spotlight hops between players, who flinch when it lands on them,
-## so lighting and animations can be checked without a running game.
-func _start_demo() -> void:
-	var timer := Timer.new()
-	timer.wait_time = DEMO_STEP_SECONDS
-	timer.timeout.connect(_demo_step)
-	add_child(timer)
-	timer.start()
-	get_tree().create_timer(0.5).timeout.connect(_demo_step)
-
-
-func _demo_step() -> void:
-	var ids: Array = _seats.keys()
-	ids.sort()
-	if ids.is_empty():
-		return
-	var next: int = (ids.find(_spotlight_player) + 1) % ids.size()
-	focus_spotlight(ids[next])
-	(_seats[ids[next]] as Seat).avatar.flinch()
-
-
-## Points the spotlight at a player (0 turns it off). Used by the round loop in M5.
+## Points the spotlight at a player (0 turns it off).
 func focus_spotlight(player_id: int) -> void:
 	_spotlight_player = player_id
 	var seat: Seat = _seats.get(player_id) as Seat
@@ -202,27 +132,22 @@ func get_local_id() -> int:
 	return _local_id
 
 
-## The local player's meme station, or null when they have no seat (or in guess mode).
-func get_station() -> MemeStation:
-	return _station as MemeStation
-
-
-## The local player's guess-mode terminal, or null when they have no seat (or in meme mode).
+## The local player's terminal, or null when they have no seat.
 func get_search_station() -> SearchStation:
-	return _station as SearchStation
+	return _station
 
 
 func get_guess_hud() -> GuessHud:
 	return _guess_hud
 
 
-## The local guess game of `--room-preview --mode=guess`, or null.
+## The local game of `--room-preview`, or null.
 func get_preview_game() -> PreviewGuessGame:
 	return _preview_game
 
 
-func get_match_hud() -> MatchHud:
-	return _match_hud
+func get_backdrop() -> SpaceBackdrop:
+	return _backdrop
 
 
 ## Glides the camera to a view (the presenter's choreography; Tab still overrides it).
@@ -235,8 +160,7 @@ func get_view() -> View:
 	return _view
 
 
-## Allows or forbids opening the CRT (meme editor or search terminal); forbidding closes
-## it if it is open.
+## Allows or forbids opening the CRT's terminal; forbidding closes it if it is open.
 func set_editing_allowed(allowed: bool) -> void:
 	_editing_allowed = allowed
 	if _station != null:
@@ -255,10 +179,10 @@ func set_hud_visible(on: bool) -> void:
 
 
 func _process(delta: float) -> void:
-	_lamp_time += delta
-	# A tired bulb: steady hum with the occasional stutter.
-	var stutter: float = 1.0 if fmod(_lamp_time, 7.3) > 0.18 else 0.35 + 0.4 * randf()
-	_lamp.light_energy = (1.9 + 0.08 * sin(_lamp_time * 23.0)) * stutter
+	_time += delta
+	# The orb drifts up and down a little and its light breathes slowly.
+	_orb.position.y = ORB_HEIGHT + 0.04 * sin(_time * 0.7)
+	_orb_light.light_energy = 1.7 + 0.12 * sin(_time * 1.3)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -266,27 +190,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not event is InputEventKey or not event.is_pressed() or event.is_echo():
 		return
-	var key: Key = (event as InputEventKey).keycode
-	if key == KEY_TAB:
+	if (event as InputEventKey).keycode == KEY_TAB:
 		_set_view(((_view + 1) % View.size()) as View, CAMERA_GLIDE_SECONDS)
 		get_viewport().set_input_as_handled()
-		return
-	# The demo keys would fight the presenter in a real game.
-	if not OS.is_debug_build() or not _is_preview() or _preview_game != null:
-		return
-	match key:
-		KEY_F:
-			var ids: Array = _seats.keys()
-			if not ids.is_empty():
-				(_seats[ids.pick_random()] as Seat).avatar.flinch()
-		KEY_G:
-			var ids: Array = _seats.keys()
-			ids.sort()
-			var next: int = ids.find(_spotlight_player) + 1
-			focus_spotlight(ids[next] if next < ids.size() else 0)
-		_:
-			return
-	get_viewport().set_input_as_handled()
 
 
 func _set_view(view: View, duration: float) -> void:
@@ -314,11 +220,8 @@ func _update_hint() -> void:
 		parts.append(tr("Esc: look up"))
 	else:
 		if _station != null and _editing_allowed and _view == View.SEAT:
-			parts.append(tr("E or click your monitor: search the database") if _station is SearchStation
-				else tr("E or click your monitor: make a meme"))
+			parts.append(tr("E or click your monitor: search the database"))
 		parts.append(tr("Tab: camera"))
-		if OS.is_debug_build() and _is_preview() and _preview_game == null:
-			parts.append(tr("Dev keys: F flinch · G spotlight"))
 	_hint_label.text = "   ·   ".join(parts)
 
 
@@ -369,7 +272,7 @@ func _build_seats(players: Array[LobbyPlayer]) -> void:
 
 
 func _on_lobby_updated(lobby: LobbyState) -> void:
-	# Players who walked out stay in their chair, greyed out (M5 adds the proper reactions).
+	# Players who walked out stay in their chair, greyed out.
 	for id: int in _seats:
 		if not lobby.has_player(id):
 			(_seats[id] as Seat).avatar.set_spectator(true)
@@ -393,34 +296,24 @@ func _table_radius() -> float:
 
 # --- Static geometry ---------------------------------------------------------------------
 
-func _build_environment() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.01, 0.01, 0.012)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.32, 0.26, 0.24)
-	env.ambient_light_energy = 0.22
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.05
+## Stars, sun and planets all around; the room's own effects (ambient occlusion) on top.
+func _build_space() -> void:
+	_backdrop = SpaceBackdrop.new()
+	_backdrop.name = "Space"
+	_backdrop.add_environment = false
+	_backdrop.sun_energy = 0.9
+	add_child(_backdrop)
+	var env: Environment = SpaceBackdrop.environment()
 	env.ssao_enabled = true
 	env.ssao_radius = 0.8
 	env.ssao_intensity = 1.6
-	env.glow_enabled = true
-	env.glow_intensity = 0.7
-	env.glow_bloom = 0.08
-	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.018
-	env.volumetric_fog_albedo = Color(0.75, 0.7, 0.62)
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 0.85
-	env.adjustment_contrast = 1.08
 	var world := WorldEnvironment.new()
 	world.environment = env
 	add_child(world)
 
 
-func _surface(color: Color, roughness: float, noise_scale: float, noise_strength: float) -> StandardMaterial3D:
-	# Procedural grime: tinted noise, so the room needs no third-party textures.
+func _surface(color: Color, roughness: float, metallic: float, noise_scale: float, noise_strength: float) -> StandardMaterial3D:
+	# Procedural wear: tinted noise, so the platform needs no third-party textures.
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.frequency = 0.01
@@ -439,59 +332,82 @@ func _surface(color: Color, roughness: float, noise_scale: float, noise_strength
 	bump.height = 512
 	bump.seamless = true
 	bump.as_normal_map = true
-	bump.bump_strength = 4.0
+	bump.bump_strength = 3.0
 	bump.noise = noise
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
 	material.normal_enabled = true
 	material.normal_texture = bump
-	material.normal_scale = 0.4
+	material.normal_scale = 0.3
 	material.roughness = roughness
+	material.metallic = metallic
 	material.uv1_scale = Vector3(noise_scale, noise_scale, noise_scale)
 	material.uv1_triplanar = true
 	return material
 
 
-func _build_shell() -> void:
-	var size: float = ROOM_HALF_SIZE * 2.0
-	var floor_material := _surface(Color(0.2, 0.19, 0.17), 0.85, 0.35, 0.6)
-	var wall_material := _surface(Color(0.3, 0.33, 0.28), 0.9, 0.3, 0.55)
-	var ceiling_material := _surface(Color(0.14, 0.14, 0.13), 0.95, 0.3, 0.4)
-	_block(Vector3(size, 0.1, size), floor_material, Vector3(0, -0.05, 0))
-	_block(Vector3(size, 0.1, size), ceiling_material, Vector3(0, CEILING_HEIGHT + 0.05, 0))
-	for side: float in [-1.0, 1.0]:
-		_block(Vector3(0.1, CEILING_HEIGHT, size), wall_material, Vector3(side * (ROOM_HALF_SIZE + 0.05), CEILING_HEIGHT / 2.0, 0))
-		_block(Vector3(size, CEILING_HEIGHT, 0.1), wall_material, Vector3(0, CEILING_HEIGHT / 2.0, side * (ROOM_HALF_SIZE + 0.05)))
-	# Tile stripe at waist height, a drain, a locked door and some pipes.
-	var stripe := _surface(Color(0.42, 0.4, 0.33), 0.5, 1.5, 0.4)
-	for side: float in [-1.0, 1.0]:
-		_block(Vector3(0.02, 0.12, size), stripe, Vector3(side * (ROOM_HALF_SIZE - 0.01), 1.0, 0))
-		_block(Vector3(size, 0.12, 0.02), stripe, Vector3(0, 1.0, side * (ROOM_HALF_SIZE - 0.01)))
-	var iron := StandardMaterial3D.new()
-	iron.albedo_color = Color(0.2, 0.17, 0.15)
-	iron.metallic = 0.8
-	iron.roughness = 0.7
-	_block(Vector3(0.5, 0.01, 0.5), iron, Vector3(1.2, 0.005, 3.6))
-	_block(Vector3(1.0, 2.1, 0.08), iron, Vector3(ROOM_HALF_SIZE - 0.01, 1.05, 1.5)).rotation.y = PI / 2.0
-	for i: int in 3:
-		var pipe := CylinderMesh.new()
-		pipe.top_radius = 0.06 + 0.02 * i
-		pipe.bottom_radius = pipe.top_radius
-		pipe.height = size
-		var instance := MeshInstance3D.new()
-		instance.mesh = pipe
-		instance.material_override = iron
-		instance.position = Vector3(-ROOM_HALF_SIZE + 0.25 + 0.22 * i, CEILING_HEIGHT - 0.2 - 0.05 * i, 0)
-		instance.rotation.x = PI / 2.0
-		add_child(instance)
+func _glow(color: Color, energy: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color.darkened(0.7)
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = energy
+	return material
+
+
+## A round deck with panel rings and a glowing edge, and a tapered underside, so it
+## reads as something built, hanging in the void.
+func _build_platform() -> void:
+	var deck_material := _surface(Color(0.2, 0.21, 0.24), 0.55, 0.6, 0.35, 0.45)
+	var hull_material := _surface(Color(0.12, 0.13, 0.15), 0.6, 0.7, 0.25, 0.4)
+	var deck := CylinderMesh.new()
+	deck.top_radius = PLATFORM_RADIUS
+	deck.bottom_radius = PLATFORM_RADIUS
+	deck.height = PLATFORM_THICKNESS
+	deck.radial_segments = 96
+	_add_mesh(deck, deck_material, Vector3(0, -PLATFORM_THICKNESS / 2.0, 0))
+	var underside := CylinderMesh.new()
+	underside.top_radius = PLATFORM_RADIUS - 0.1
+	underside.bottom_radius = 1.2
+	underside.height = 1.6
+	underside.radial_segments = 64
+	_add_mesh(underside, hull_material, Vector3(0, -PLATFORM_THICKNESS - 0.8, 0))
+	var core := SphereMesh.new()
+	core.radius = 0.5
+	core.height = 0.6
+	_add_mesh(core, _glow(Color(0.35, 0.7, 1.0), 2.5), Vector3(0, -PLATFORM_THICKNESS - 1.65, 0))
+
+	var edge_glow := _glow(Color(0.35, 0.75, 1.0), 2.2)
+	var faint_glow := _glow(Color(0.3, 0.6, 0.9), 0.7)
+	var edge := TorusMesh.new()
+	edge.inner_radius = PLATFORM_RADIUS - 0.04
+	edge.outer_radius = PLATFORM_RADIUS + 0.04
+	edge.rings = 96
+	_add_mesh(edge, edge_glow, Vector3(0, -0.02, 0))
+	# Panel seams: thin dim rings set into the deck.
+	for radius: float in [3.2, 4.4]:
+		var seam := TorusMesh.new()
+		seam.inner_radius = radius - 0.012
+		seam.outer_radius = radius + 0.012
+		seam.rings = 96
+		var ring := _add_mesh(seam, faint_glow, Vector3(0, 0.0, 0))
+		ring.scale = Vector3(1.0, 0.2, 1.0)
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# A low light under the deck lights the hull from below, so it isn't a black hole.
+	var under_light := OmniLight3D.new()
+	under_light.light_color = Color(0.35, 0.7, 1.0)
+	under_light.light_energy = 1.2
+	under_light.omni_range = 5.0
+	under_light.position = Vector3(0, -PLATFORM_THICKNESS - 2.2, 0)
+	add_child(under_light)
 
 
 func _build_table() -> void:
-	var top_material := _surface(Color(0.26, 0.18, 0.12), 0.75, 0.8, 0.5)
+	var top_material := _surface(Color(0.14, 0.15, 0.18), 0.45, 0.5, 0.8, 0.4)
 	var metal := StandardMaterial3D.new()
-	metal.albedo_color = Color(0.18, 0.16, 0.15)
-	metal.metallic = 0.75
-	metal.roughness = 0.55
+	metal.albedo_color = Color(0.16, 0.17, 0.2)
+	metal.metallic = 0.8
+	metal.roughness = 0.4
 	var height: float = _table_height()
 	var top := CylinderMesh.new()
 	top.top_radius = _table_radius()
@@ -499,6 +415,12 @@ func _build_table() -> void:
 	top.height = 0.06
 	top.radial_segments = 64
 	_add_mesh(top, top_material, Vector3(0, height - 0.03, 0))
+	var trim := TorusMesh.new()
+	trim.inner_radius = _table_radius() - 0.01
+	trim.outer_radius = _table_radius() + 0.012
+	trim.rings = 96
+	var trim_ring := _add_mesh(trim, _glow(Color(0.35, 0.75, 1.0), 0.9), Vector3(0, height - 0.045, 0))
+	trim_ring.scale = Vector3(1.0, 0.35, 1.0)
 	var column := CylinderMesh.new()
 	column.top_radius = 0.18
 	column.bottom_radius = 0.35
@@ -506,45 +428,37 @@ func _build_table() -> void:
 	_add_mesh(column, metal, Vector3(0, (height - 0.06) / 2.0, 0))
 
 
-func _build_lamp() -> void:
-	var shade := CylinderMesh.new()
-	shade.top_radius = 0.08
-	shade.bottom_radius = 0.38
-	shade.height = 0.3
-	var shade_material := StandardMaterial3D.new()
-	shade_material.albedo_color = Color(0.22, 0.24, 0.2)
-	shade_material.metallic = 0.6
-	shade_material.roughness = 0.5
-	shade_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var lamp_height: float = 2.45
-	_add_mesh(shade, shade_material, Vector3(0, lamp_height, 0))
-	var cord := CylinderMesh.new()
-	cord.top_radius = 0.008
-	cord.bottom_radius = 0.008
-	cord.height = CEILING_HEIGHT - lamp_height
-	_add_mesh(cord, shade_material, Vector3(0, (CEILING_HEIGHT + lamp_height) / 2.0, 0))
-	var bulb := SphereMesh.new()
-	bulb.radius = 0.06
-	bulb.height = 0.12
-	var bulb_material := StandardMaterial3D.new()
-	bulb_material.emission_enabled = true
-	bulb_material.emission = Color(1.0, 0.78, 0.5)
-	bulb_material.emission_energy_multiplier = 6.0
-	_add_mesh(bulb, bulb_material, Vector3(0, lamp_height - 0.12, 0))
-	_lamp = OmniLight3D.new()
-	_lamp.light_color = Color(1.0, 0.78, 0.52)
-	_lamp.omni_range = 7.0
-	_lamp.omni_attenuation = 1.2
-	_lamp.shadow_enabled = true
-	_lamp.light_volumetric_fog_energy = 0.6
-	_lamp.position = Vector3(0, lamp_height - 0.16, 0)
-	add_child(_lamp)
-
-
-func _block(size: Vector3, material: Material, at: Vector3) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return _add_mesh(mesh, material, at)
+## A pale orb hovering over the table: the room's main light.
+func _build_orb() -> void:
+	_orb = Node3D.new()
+	_orb.name = "Orb"
+	_orb.position = Vector3(0, ORB_HEIGHT, 0)
+	add_child(_orb)
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.11
+	sphere.height = 0.22
+	var orb_mesh := MeshInstance3D.new()
+	orb_mesh.mesh = sphere
+	orb_mesh.material_override = _glow(Color(1.0, 0.9, 0.78), 5.0)
+	orb_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_orb.add_child(orb_mesh)
+	var halo := TorusMesh.new()
+	halo.inner_radius = 0.2
+	halo.outer_radius = 0.215
+	var halo_mesh := MeshInstance3D.new()
+	halo_mesh.mesh = halo
+	halo_mesh.material_override = _glow(Color(0.55, 0.85, 1.0), 2.0)
+	halo_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	halo_mesh.rotation.x = 0.35
+	_orb.add_child(halo_mesh)
+	_orb_light = OmniLight3D.new()
+	_orb_light.light_color = Color(1.0, 0.9, 0.8)
+	_orb_light.light_energy = 1.7
+	_orb_light.omni_range = 7.0
+	_orb_light.omni_attenuation = 1.2
+	_orb_light.shadow_enabled = true
+	_orb_light.position = Vector3(0, -0.05, 0)
+	_orb.add_child(_orb_light)
 
 
 func _add_mesh(mesh: Mesh, material: Material, at: Vector3) -> MeshInstance3D:

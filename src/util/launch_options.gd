@@ -13,16 +13,15 @@ extends RefCounted
 ##   --min-players=<n>    override the minimum player count (debug builds only)
 ##   --smoke-test         quit with exit code 0 once the game starts, non-zero on failure
 ##   --smoke-test=game    the same, but only once a whole game has been played to the end
-##   --auto-play          a bot plays for you: submits memes, votes and sometimes shoots (dev)
+##   --auto-play          a bot plays for you: asks stock questions, answers, guesses (dev)
 ##   --fast-rounds        (host) very short phases, for automated full games (debug builds only)
-##   --seed=<n>           (host) fixed seed for prompts, spotlight order and tie-breaks
-##   --offline-templates  (host) only our original templates; don't fetch popular ones
+##   --seed=<n>           (host) fixed seed for the deal and the turn order
+##   --offline-portraits  never fetch portraits from Wikimedia Commons
 ##   --no-music           no background music (local test windows besides the host)
-##   --mode=<mode>        (host) the lobby's game mode: memes (default) or guess
-##   --pack=<id>          (host) guess mode's identity pack (data/identities/<id>.json)
+##   --pack=<id>          (host) the identity pack (data/identities/<id>.json or a custom one)
 ##   --room-preview=<n>   open the 3D room directly with n fake players, no network (dev)
 ##   --room-camera=<view> first room camera: seat (default), tv, overview, or editor
-##                        (starts zoomed into your CRT's meme editor)
+##                        (starts zoomed into your CRT's search terminal)
 
 var host: bool = false
 var join_target: String = ""
@@ -39,10 +38,9 @@ var auto_play: bool = false
 var fast_rounds: bool = false
 ## 0 means "random".
 var seed_value: int = 0
-var offline_templates: bool = false
+var offline_portraits: bool = false
 var no_music: bool = false
-## "" means "not set" (memes).
-var mode: String = ""
+## "" means "not set" (musicians).
 var pack: String = ""
 ## 0 means "not set"; otherwise the number of fake players in the room preview.
 var room_preview: int = 0
@@ -85,13 +83,10 @@ static func parse(args: PackedStringArray) -> LaunchOptions:
 				options.auto_play = true
 			"--fast-rounds":
 				options.fast_rounds = true
-			"--offline-templates":
-				options.offline_templates = true
+			"--offline-portraits":
+				options.offline_portraits = true
 			"--no-music":
 				options.no_music = true
-			"--mode":
-				if GameMode.is_valid(value):
-					options.mode = value
 			"--pack":
 				if IdentityPack.is_valid_id(value):
 					options.pack = value

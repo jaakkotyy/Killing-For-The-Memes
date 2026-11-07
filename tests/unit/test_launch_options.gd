@@ -62,9 +62,9 @@ func test_plain_smoke_test_only_waits_for_the_start() -> void:
 	assert_eq(options.seed_value, 0)
 
 
-func test_offline_templates_flag() -> void:
-	assert_false(LaunchOptions.parse(PackedStringArray()).offline_templates)
-	assert_true(LaunchOptions.parse(PackedStringArray(["--offline-templates"])).offline_templates)
+func test_offline_portraits_flag() -> void:
+	assert_false(LaunchOptions.parse(PackedStringArray()).offline_portraits)
+	assert_true(LaunchOptions.parse(PackedStringArray(["--offline-portraits"])).offline_portraits)
 
 
 func test_no_music_flag() -> void:

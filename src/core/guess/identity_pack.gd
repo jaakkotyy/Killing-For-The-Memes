@@ -1,6 +1,6 @@
 class_name IdentityPack
 extends RefCounted
-## A pack of identities for guess mode: the database a player searches on their terminal
+## A pack of identities: the database a player searches on their terminal
 ## and the server deals from. Packs are JSON files in data/identities/:
 ##
 ##   {"id": "musicians", "name": "Musicians", "version": 1, "source": "Wikidata (CC0)",

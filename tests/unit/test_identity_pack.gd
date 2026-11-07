@@ -1,5 +1,5 @@
 extends GutTest
-## Guess mode's database: loading and validating identity packs, filters, queries and
+## The identity database: loading and validating identity packs, filters, queries and
 ## the deck that deals identities.
 
 const PACK: String = """{

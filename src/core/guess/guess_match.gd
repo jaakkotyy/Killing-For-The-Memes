@@ -1,9 +1,8 @@
 class_name GuessMatch
 extends RefCounted
-## Guess mode's authoritative rules ("Who Am I?", docs/GUESS_MODE.md). Same contract as
-## GameMatch: time comes in as `now`, randomness from an injected RNG, player input as
-## untrusted intents returning a GameMatch.IntentResult, and to_snapshot(now, viewer) is
-## the only thing a client may see.
+## The game's authoritative rules ("Who Am I?", docs/GAME_DESIGN.md). Time comes in as
+## `now`, randomness from an injected RNG, player input as untrusted intents returning an
+## Intent.Result, and to_snapshot(now, viewer) is the only thing a client may see.
 ##
 ## A round: DEAL, then turns (ASK → ANSWER → RESULT) until everyone has solved their
 ## identity or the round clock runs out, then REVEAL. After config.guess_rounds rounds,
@@ -59,13 +58,27 @@ var _answers: Dictionary[int, int] = {}  # answerer id -> Answer
 var _last_answer: int = Answer.UNSURE
 
 
+## A player's own question text, made safe to show: control characters become spaces,
+## runs of spaces collapse, and it is cut to QUESTION_MAX_LENGTH. Non-strings give "".
+static func sanitize_question(raw: Variant) -> String:
+	if typeof(raw) != TYPE_STRING:
+		return ""
+	var text: String = raw
+	var printable: String = ""
+	for i: int in range(text.length()):
+		var code: int = text.unicode_at(i)
+		printable += text[i] if code >= 32 and code != 127 else " "
+	var collapsed: String = " ".join(printable.split(" ", false))
+	return collapsed.substr(0, QUESTION_MAX_LENGTH).strip_edges()
+
+
 func _init(p_config: GameConfig, lobby_players: Array[LobbyPlayer], p_pack: IdentityPack,
 		rng: RandomNumberGenerator) -> void:
 	config = p_config
 	pack = p_pack
 	_deck = IdentityDeck.new(pack, rng, config.deal_pool)
 	for lobby_player: LobbyPlayer in lobby_players:
-		_players[lobby_player.id] = PlayerState.new(lobby_player.id, lobby_player.name, lobby_player.seat, 0)
+		_players[lobby_player.id] = PlayerState.new(lobby_player.id, lobby_player.name, lobby_player.seat)
 		_scores[lobby_player.id] = 0
 
 
@@ -90,24 +103,24 @@ func update(now: float) -> void:
 
 ## The asker's question: {"text": "..."} for their own, or {"stock": index} for one of the
 ## pack's stock questions.
-func ask(player_id: int, data: Variant, now: float) -> GameMatch.IntentResult:
+func ask(player_id: int, data: Variant, now: float) -> Intent.Result:
 	if phase != Phase.ASK:
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	if player_id != _asker_id:
-		return GameMatch.IntentResult.NOT_ALLOWED
+		return Intent.Result.NOT_ALLOWED
 	if not data is Dictionary:
-		return GameMatch.IntentResult.INVALID
+		return Intent.Result.INVALID
 	var d: Dictionary = data
 	var question: Dictionary = {}
 	if d.has("stock"):
 		var stock: IdentityPack.StockQuestion = pack.stock_question(d["stock"])
 		if stock == null:
-			return GameMatch.IntentResult.INVALID
+			return Intent.Result.INVALID
 		question = {"text": stock.text, "stock": int(d["stock"])}
 	else:
-		var text: String = MemeSpec.sanitize_caption(d.get("text")).substr(0, QUESTION_MAX_LENGTH)
+		var text: String = sanitize_question(d.get("text")).substr(0, QUESTION_MAX_LENGTH)
 		if text.is_empty():
-			return GameMatch.IntentResult.INVALID
+			return Intent.Result.INVALID
 		question = {"text": text, "stock": -1}
 	_question = question
 	_questions_asked[player_id] = int(_questions_asked.get(player_id, 0)) + 1
@@ -115,34 +128,34 @@ func ask(player_id: int, data: Variant, now: float) -> GameMatch.IntentResult:
 	_set_phase(Phase.ANSWER, now + config.answer_duration)
 	if _answerers().is_empty():
 		_close_question(now)
-	return GameMatch.IntentResult.OK
+	return Intent.Result.OK
 
 
 ## Answers the question on the wall TV: 1 Yes, -1 No, 0 "I don't know". Can be changed
 ## until the answering time is up.
-func answer(player_id: int, value: Variant, now: float) -> GameMatch.IntentResult:
+func answer(player_id: int, value: Variant, now: float) -> Intent.Result:
 	if phase != Phase.ANSWER:
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	if typeof(value) != TYPE_INT or not [Answer.YES, Answer.NO, Answer.UNSURE].has(value):
-		return GameMatch.IntentResult.INVALID
+		return Intent.Result.INVALID
 	if not _answerers().has(player_id):
-		return GameMatch.IntentResult.NOT_ALLOWED
+		return Intent.Result.NOT_ALLOWED
 	_answers[player_id] = int(value)
 	if _answers.size() >= _answerers().size():
 		_close_question(now)
-	return GameMatch.IntentResult.OK
+	return Intent.Result.OK
 
 
 ## Guesses the player's own identity: [param entry_id] is a pack entry id.
-func guess(player_id: int, entry_id: Variant, now: float) -> GameMatch.IntentResult:
+func guess(player_id: int, entry_id: Variant, now: float) -> Intent.Result:
 	if not _in_turns():
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	if not _is_present(player_id) or not _identities.has(player_id) or _solved.has(player_id):
-		return GameMatch.IntentResult.NOT_ALLOWED
+		return Intent.Result.NOT_ALLOWED
 	if _locked.has(player_id):
-		return GameMatch.IntentResult.ALREADY_DONE
+		return Intent.Result.ALREADY_DONE
 	if typeof(entry_id) != TYPE_STRING or not pack.has_entry(entry_id):
-		return GameMatch.IntentResult.INVALID
+		return Intent.Result.INVALID
 	var correct: bool = entry_id == _identities[player_id]
 	if correct:
 		var points: int = maxi(config.solve_min,
@@ -161,7 +174,7 @@ func guess(player_id: int, entry_id: Variant, now: float) -> GameMatch.IntentRes
 			_end_round(now)
 		elif player_id == _asker_id and phase == Phase.ASK:
 			_next_turn(now)  # nothing left for them to ask
-	return GameMatch.IntentResult.OK
+	return Intent.Result.OK
 
 
 ## A player disconnected. They are out for good; the game carries on without them.

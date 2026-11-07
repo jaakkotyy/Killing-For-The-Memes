@@ -6,8 +6,7 @@ extends RefCounted
 ## It validates them against the lobby and match rules, and its signals tell Session what to
 ## broadcast. It never touches the network itself, so it can be unit-tested without peers.
 ##
-## Once the game starts it owns the match: a GameMatch, or a GuessMatch in guess mode
-## (LobbyState.mode). Anything that changes the match marks it
+## Once the game starts it owns the GuessMatch. Anything that changes the match marks it
 ## dirty; Session calls flush() once per frame, which emits match_changed at most once, and
 ## then sends every player their own snapshot_for().
 
@@ -22,21 +21,12 @@ signal match_changed
 ## The host ended the game and everyone is back in the lobby (LobbyState.to_dict()).
 signal returned_to_lobby(snapshot: Dictionary)
 
-const PROMPT_PACK_PATH: String = "res://data/prompts/default.json"
-
 var lobby: LobbyState
-## The running meme match; null in the lobby or in a guess game.
-var game_match: GameMatch
-## The running guess match; null in the lobby or in a meme game.
+## The running match; null in the lobby.
 var guess_match: GuessMatch
 ## Rules for the next match. Replace before the game starts (e.g. faster rounds for testing).
 var config: GameConfig = GameConfig.new()
-## Template ids memes may use (from data/meme_templates.json); empty accepts any valid id.
-var allowed_templates: PackedStringArray = []
-## When set, decides instead which template ids memes may use (id -> bool); see
-## GameMatch.template_accepts.
-var template_accepts: Callable
-## Seeds the match's shuffles and tie-breaks; 0 picks a random seed.
+## Seeds the match's deals and orders; 0 picks a random seed.
 var rng_seed: int = 0
 
 var _min_players: int
@@ -77,14 +67,12 @@ func handle_join_request(peer_id: int, requested_name: Variant, version: Variant
 	_emit_lobby_changed()
 
 
-## Host only, in the lobby: the next game's mode and (for guess mode) identity pack.
-## Untrusted arguments; an unknown mode or pack changes nothing.
-func handle_set_mode(peer_id: int, mode: Variant, pack: Variant) -> void:
-	if peer_id != LobbyState.HOST_ID or lobby.started or not GameMode.is_valid(mode) or not IdentityPack.exists(pack):
+## Host only, in the lobby: the next game's identity pack. An unknown pack changes nothing.
+func handle_set_pack(peer_id: int, pack: Variant) -> void:
+	if peer_id != LobbyState.HOST_ID or lobby.started or not IdentityPack.exists(pack):
 		return
-	if lobby.mode == mode and lobby.pack == pack:
+	if lobby.pack == pack:
 		return
-	lobby.mode = mode
 	lobby.pack = pack
 	_emit_lobby_changed()
 
@@ -102,94 +90,56 @@ func handle_set_ready(peer_id: int, is_ready: Variant) -> void:
 func handle_start_request(peer_id: int, now: float = 0.0) -> void:
 	if peer_id != LobbyState.HOST_ID or not lobby.can_start(_min_players):
 		return
-	if lobby.mode == GameMode.GUESS:
-		var pack: IdentityPack = IdentityPack.load_pack(lobby.pack)
-		if pack == null:
-			push_error("Identity pack %s is missing or broken" % lobby.pack)
-			return
-		lobby.started = true
-		guess_match = GuessMatch.new(config, lobby.get_players(), pack, _new_rng())
-		guess_match.phase_changed.connect(_mark_dirty.unbind(1))
-		guess_match.player_left.connect(_mark_dirty.unbind(1))
-		guess_match.start(now)
-	else:
-		lobby.started = true
-		game_match = _new_match()
-		game_match.phase_changed.connect(_mark_dirty.unbind(1))
-		game_match.player_left.connect(_mark_dirty.unbind(1))
-		game_match.start(now)
+	var pack: IdentityPack = IdentityPack.load_pack(lobby.pack)
+	if pack == null:
+		push_error("Identity pack %s is missing or broken" % lobby.pack)
+		return
+	lobby.started = true
+	guess_match = GuessMatch.new(config, lobby.get_players(), pack, _new_rng())
+	guess_match.phase_changed.connect(_mark_dirty.unbind(1))
+	guess_match.player_left.connect(_mark_dirty.unbind(1))
+	guess_match.start(now)
 	game_started.emit(lobby.to_dict())
 	_mark_dirty()
 
 
 ## Advances the match clock. Call every frame.
 func update(now: float) -> void:
-	if game_match != null:
-		game_match.update(now)
 	if guess_match != null:
 		guess_match.update(now)
 
 
 ## Emits match_changed if anything changed since the last flush. Call once per frame.
 func flush() -> void:
-	if _dirty and (game_match != null or guess_match != null):
+	if _dirty and guess_match != null:
 		_dirty = false
 		match_changed.emit()
 
 
 ## What [param peer_id] may see of the match right now (hidden information removed).
 func snapshot_for(peer_id: int, now: float) -> Dictionary:
-	if guess_match != null:
-		return guess_match.to_snapshot(now, peer_id)
-	return game_match.to_snapshot(now, peer_id) if game_match != null else {}
+	return guess_match.to_snapshot(now, peer_id) if guess_match != null else {}
 
 
-## Match intents. Arguments come straight from the network; GameMatch validates them.
-func handle_submit_meme(peer_id: int, meme: Variant, now: float) -> GameMatch.IntentResult:
-	if game_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
-	return _after_intent(game_match.submit_meme(peer_id, meme, now))
-
-
-func handle_vote(peer_id: int, value: Variant, now: float) -> GameMatch.IntentResult:
-	if game_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
-	return _after_intent(game_match.cast_vote(peer_id, value, now))
-
-
-func handle_shoot(peer_id: int, now: float) -> GameMatch.IntentResult:
-	if game_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
-	return _after_intent(game_match.shoot(peer_id, now))
-
-
-## Host only: moves on from the meme on the wall TV (see GameMatch.present_next).
-func handle_present_next(peer_id: int, from_index: Variant, now: float) -> GameMatch.IntentResult:
-	if game_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
-	if peer_id != LobbyState.HOST_ID:
-		return GameMatch.IntentResult.NOT_ALLOWED
-	return _after_intent(game_match.present_next(from_index, now))
-
-
-## Guess mode: the asker's question ({text} or {stock}). GuessMatch validates it.
-func handle_ask(peer_id: int, question: Variant, now: float) -> GameMatch.IntentResult:
+## The asker's question ({text} or {stock}). Arguments come straight from the network;
+## GuessMatch validates them.
+func handle_ask(peer_id: int, question: Variant, now: float) -> Intent.Result:
 	if guess_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	return _after_intent(guess_match.ask(peer_id, question, now))
 
 
-## Guess mode: 1 Yes, -1 No, 0 "I don't know".
-func handle_answer(peer_id: int, value: Variant, now: float) -> GameMatch.IntentResult:
+## 1 Yes, -1 No, 0 "I don't know".
+func handle_answer(peer_id: int, value: Variant, now: float) -> Intent.Result:
 	if guess_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	return _after_intent(guess_match.answer(peer_id, value, now))
 
 
-## Guess mode: a guess at your own identity (a pack entry id).
-func handle_guess(peer_id: int, entry_id: Variant, now: float) -> GameMatch.IntentResult:
+## A guess at your own identity (a pack entry id).
+func handle_guess(peer_id: int, entry_id: Variant, now: float) -> Intent.Result:
 	if guess_match == null:
-		return GameMatch.IntentResult.WRONG_PHASE
+		return Intent.Result.WRONG_PHASE
 	return _after_intent(guess_match.guess(peer_id, entry_id, now))
 
 
@@ -197,7 +147,6 @@ func handle_guess(peer_id: int, entry_id: Variant, now: float) -> GameMatch.Inte
 func handle_return_to_lobby(peer_id: int) -> void:
 	if peer_id != LobbyState.HOST_ID or not is_match_over():
 		return
-	game_match = null
 	guess_match = null
 	_dirty = false
 	lobby.started = false
@@ -207,9 +156,7 @@ func handle_return_to_lobby(peer_id: int) -> void:
 
 
 func is_match_over() -> bool:
-	if guess_match != null:
-		return guess_match.phase == GuessMatch.Phase.GAME_OVER
-	return game_match != null and game_match.phase == GameMatch.Phase.GAME_OVER
+	return guess_match != null and guess_match.phase == GuessMatch.Phase.GAME_OVER
 
 
 func handle_peer_disconnected(peer_id: int, now: float = 0.0) -> void:
@@ -217,8 +164,6 @@ func handle_peer_disconnected(peer_id: int, now: float = 0.0) -> void:
 	if lobby.has_player(peer_id):
 		lobby.remove_player(peer_id)
 		_emit_lobby_changed()
-	if game_match != null:
-		game_match.remove_player(peer_id, now)
 	if guess_match != null:
 		guess_match.remove_player(peer_id, now)
 
@@ -251,20 +196,8 @@ func _new_rng() -> RandomNumberGenerator:
 	return rng
 
 
-func _new_match() -> GameMatch:
-	var rng: RandomNumberGenerator = _new_rng()
-	var file := FileAccess.open(PROMPT_PACK_PATH, FileAccess.READ)
-	var deck: PromptDeck = PromptDeck.from_json(file.get_as_text() if file != null else "", rng)
-	if deck == null:
-		push_error("Prompt pack %s is missing or broken" % PROMPT_PACK_PATH)
-		deck = PromptDeck.new(PackedStringArray(["Make a meme about this room."]), rng)
-	var created := GameMatch.new(config, lobby.get_players(), deck, rng, allowed_templates)
-	created.template_accepts = template_accepts
-	return created
-
-
-func _after_intent(result: GameMatch.IntentResult) -> GameMatch.IntentResult:
-	if result == GameMatch.IntentResult.OK:
+func _after_intent(result: Intent.Result) -> Intent.Result:
+	if result == Intent.Result.OK:
 		_mark_dirty()
 	return result
 

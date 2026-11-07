@@ -19,9 +19,6 @@ const METRICS_PATH: String = "res://assets/models/player/player_metrics.json"
 ## The artist's hat, already fitted to the head in the body's rest pose (build_hat.py).
 const HAT_MODEL: PackedScene = preload("res://assets/models/player/hat.glb")
 const HAT_BONE: String = "Head"
-## Dead players slump forward over the keyboard (radians, pivoting at the hips).
-const DEATH_SLUMP: float = 0.5
-const DEATH_SECONDS: float = 0.9
 
 ## Godot's importer strips the "_loop" suffix of the Blender action and makes it loop.
 ## ANIM_IDLE is the typing pose: hands on the keyboard, breathing.
@@ -64,7 +61,6 @@ var _material: ShaderMaterial
 var _label: Label3D
 var _wrists: Dictionary = {}  # "L"/"R" -> BoneAttachment3D
 var _hat: Node3D
-var _dead: bool = false
 var _relaxed: bool = true
 var _first_person: bool = false
 var _sip_in: float = 0.0
@@ -133,7 +129,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _anim == null or _dead or not _anim.is_playing() or _anim.current_animation != _rest_animation():
+	if _anim == null or not _anim.is_playing() or _anim.current_animation != _rest_animation():
 		return
 	if _rest_animation() == ANIM_IDLE or not _anim.has_animation(ANIM_DRINK):
 		return
@@ -143,22 +139,19 @@ func _process(delta: float) -> void:
 		_play_once(ANIM_DRINK)
 
 
-## Short recoil, e.g. when shot at. Returns to the idle loop afterwards.
+## Short recoil, e.g. after a wrong guess. Returns to the idle loop afterwards.
 func flinch() -> void:
-	if not _dead:
-		_play_once(ANIM_FLINCH)
+	_play_once(ANIM_FLINCH)
 
 
-## Raises the head toward the wall TV (spotlight phase).
+## Raises the head toward the screen (a question is up).
 func look_up() -> void:
-	if not _dead:
-		_play_once(ANIM_LOOK_UP)
+	_play_once(ANIM_LOOK_UP)
 
 
 ## Back to the resting animation (relaxed or typing, whichever this body is in).
 func idle() -> void:
-	if not _dead:
-		_play_rest(false)
+	_play_rest(false)
 
 
 ## Sits back between rounds: this seat's relaxed idle, with a sip now and then.
@@ -167,7 +160,7 @@ func relax() -> void:
 	idle()
 
 
-## Hands on the keyboard (making memes).
+## Hands on the keyboard (searching the database, asking).
 func type_on_keyboard() -> void:
 	_relaxed = false
 	idle()
@@ -177,10 +170,9 @@ func is_relaxed() -> bool:
 	return _relaxed
 
 
-## The winner stands up, waves and sits back down.
+## The winner (or a solver) stands up, waves and sits back down.
 func celebrate() -> void:
-	if not _dead:
-		_play_once(ANIM_WAVE)
+	_play_once(ANIM_WAVE)
 
 
 ## The animation this body returns to when nothing else is playing.
@@ -197,32 +189,7 @@ func hold_pose(animation: StringName, time: float) -> void:
 	_anim.pause()
 
 
-## The cartoon death: a last flinch, a puff of smoke, and the body slumps over the
-## keyboard, washed out. [param animated] false jumps straight to the end (e.g. when a
-## client joins the room after the player already died).
-func die(animated: bool = true) -> void:
-	if _dead:
-		return
-	_dead = true
-	set_spectator(true)
-	if not animated:
-		_freeze_dead()
-		_model.transform = _slump_transform(1.0)
-		return
-	_play_once(ANIM_FLINCH)
-	_puff()
-	var tween := create_tween()
-	tween.tween_interval(0.25)
-	tween.tween_callback(_freeze_dead)
-	tween.tween_method(func(t: float) -> void: _model.transform = _slump_transform(t),
-		0.0, 1.0, DEATH_SECONDS).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-
-
-func is_dead() -> bool:
-	return _dead
-
-
-## Spectators (eliminated players) are drawn washed out.
+## Players who left are drawn washed out.
 func set_spectator(enabled: bool) -> void:
 	_material.set_shader_parameter("desaturate", 0.85 if enabled else 0.0)
 
@@ -242,8 +209,7 @@ func is_hat_visible() -> bool:
 func set_first_person(on: bool) -> void:
 	if on != _first_person:
 		_first_person = on
-		if not _dead:
-			_play_rest(false)
+		_play_rest(false)
 	if _hat == null:
 		return
 	var mode: GeometryInstance3D.ShadowCastingSetting = (
@@ -261,48 +227,6 @@ func get_wrist(side: String) -> Node3D:
 ## Hides the name tag (your own, in first person).
 func set_label_visible(on: bool) -> void:
 	_label.visible = on
-
-
-func _freeze_dead() -> void:
-	hold_pose(ANIM_FLINCH, 0.1)
-
-
-## Rotation about the seated hips: t = 0 upright, 1 fully slumped.
-func _slump_transform(t: float) -> Transform3D:
-	var pivot: Vector3 = metric_vector("seated_hips")
-	var turn := Transform3D(Basis(Vector3.RIGHT, DEATH_SLUMP * t), Vector3.ZERO)
-	return Transform3D(Basis(), pivot) * turn * Transform3D(Basis(), -pivot)
-
-
-## A one-shot puff of pale smoke rising from the head.
-func _puff() -> void:
-	var puff := CPUParticles3D.new()
-	puff.one_shot = true
-	puff.amount = 24
-	puff.lifetime = 1.4
-	puff.explosiveness = 0.9
-	puff.direction = Vector3.UP
-	puff.spread = 60.0
-	puff.initial_velocity_min = 0.3
-	puff.initial_velocity_max = 0.8
-	puff.gravity = Vector3(0, 0.25, 0)
-	puff.scale_amount_min = 0.6
-	puff.scale_amount_max = 1.4
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.05
-	sphere.height = 0.1
-	sphere.radial_segments = 8
-	sphere.rings = 4
-	var smoke := StandardMaterial3D.new()
-	smoke.albedo_color = Color(0.85, 0.85, 0.8, 0.55)
-	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sphere.material = smoke
-	puff.mesh = sphere
-	puff.position = metric_vector("seated_eyes") + Vector3(0, 0.1, 0)
-	add_child(puff)
-	puff.emitting = true
-	puff.finished.connect(puff.queue_free)
 
 
 func _play_once(animation: StringName) -> void:

@@ -1,5 +1,5 @@
 extends GutTest
-## Guess mode in the 3D room: a preview room plays a local guess game through the real
+## The game in the 3D room: a preview room plays a local guess game through the real
 ## GuessPresenter, GuessHud, placards and the SearchTerminal on the CRT.
 
 const ROOM_SCENE: PackedScene = preload("res://src/world/room/room.tscn")
@@ -10,18 +10,16 @@ var preview: PreviewGuessGame
 
 func before_each() -> void:
 	# Portraits would come from the internet.
-	TemplateImageCache.offline = true
+	PortraitCache.offline = true
 	room = ROOM_SCENE.instantiate()
 	room.preview_players = 3
-	room.preview_mode = GameMode.GUESS
-	room.demo_enabled = false
 	add_child_autofree(room)
 	await wait_physics_frames(2)
 	preview = room.get_preview_game()
 
 
 func after_each() -> void:
-	TemplateImageCache.offline = false
+	PortraitCache.offline = false
 
 
 func _game() -> GuessMatch:
@@ -38,12 +36,10 @@ func _until_my_turn() -> void:
 	assert_eq(_game().asker_id(), PreviewGuessGame.LOCAL_ID)
 
 
-func test_guess_mode_gets_the_terminal_instead_of_the_meme_editor() -> void:
+func test_the_room_gets_the_terminal_and_the_hud() -> void:
 	assert_not_null(preview)
-	assert_null(room.get_station())
 	assert_not_null(room.get_search_station())
 	assert_not_null(room.get_guess_hud())
-	assert_null(room.get_match_hud())
 	assert_eq(room.get_search_station().terminal.pack, preview.guess_pack())
 
 

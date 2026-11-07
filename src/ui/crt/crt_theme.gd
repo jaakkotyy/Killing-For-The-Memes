@@ -1,7 +1,7 @@
 class_name CrtTheme
 extends RefCounted
-## The green-phosphor terminal look shared by everything shown on a player's CRT (the meme
-## editor, guess mode's search terminal). Built in code so the colours live in one place.
+## The green-phosphor terminal look of everything shown on a player's CRT (the search
+## terminal). Built in code so the colours live in one place.
 
 const PHOSPHOR: Color = Color(0.45, 1.0, 0.62)
 const PHOSPHOR_DIM: Color = Color(0.2, 0.5, 0.3)

@@ -73,7 +73,7 @@ func test_the_host_can_pick_a_custom_pack_and_play_it() -> void:
 		server.handle_join_request(id, "P%d" % id, Protocol.VERSION)
 	server.handle_set_ready(2, true)
 	server.handle_set_ready(3, true)
-	server.handle_set_mode(1, GameMode.GUESS, PACK_ID)
+	server.handle_set_pack(1, PACK_ID)
 	assert_eq(server.lobby.pack, PACK_ID)
 	server.handle_start_request(1, 0.0)
 	assert_not_null(server.guess_match)

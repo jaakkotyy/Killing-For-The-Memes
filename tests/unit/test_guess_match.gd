@@ -1,8 +1,8 @@
 extends GutTest
-## Guess mode's rules (GuessMatch) and the client's view of them (GuessView).
+## The rules (GuessMatch) and the client's view of them (GuessView).
 
 const Phase := GuessMatch.Phase
-const Result := GameMatch.IntentResult
+const Result := Intent.Result
 const YES: int = GuessMatch.Answer.YES
 const NO: int = GuessMatch.Answer.NO
 const UNSURE: int = GuessMatch.Answer.UNSURE

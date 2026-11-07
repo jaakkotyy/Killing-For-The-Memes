@@ -1,5 +1,5 @@
 extends GutTest
-## Guess mode's CRT terminal (SearchTerminal), fed by views of a real GuessMatch: filters,
+## The CRT terminal (SearchTerminal), fed by views of a real GuessMatch: filters,
 ## crossing out, clues as filters, asking, answering and guessing only when allowed.
 
 const Phase := GuessMatch.Phase

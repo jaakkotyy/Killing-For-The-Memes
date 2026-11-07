@@ -4,7 +4,7 @@ extends RefCounted
 ## (`image`), turned into a thumbnail URL on upload.wikimedia.org. The URL is always
 ## rebuilt here from the file name, never taken from data, so a pack can only ever point
 ## at Commons thumbnails. Each file has its own license, so the pictures are fetched at
-## run time (TemplateImageCache) and never shipped.
+## run time (PortraitCache) and never shipped.
 
 const HOST: String = "https://upload.wikimedia.org/wikipedia/commons/thumb/"
 ## One of Commons' standard thumbnail widths (other widths may be refused).
