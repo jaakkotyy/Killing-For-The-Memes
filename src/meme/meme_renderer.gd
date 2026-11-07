@@ -27,14 +27,26 @@ var _animation: AnimatedTemplate
 var _shown_frame: int = -1
 
 
-## The bold caption font. A placeholder until the OFL meme font is added (see CREDITS.md).
+## The caption font: the real Impact, from the player's own system (every Windows has
+## it; nothing is shipped), then look-alikes. Without any of them, an emboldened default.
 static func meme_font() -> Font:
 	if _meme_font == null:
-		var variation := FontVariation.new()
-		variation.base_font = ThemeDB.fallback_font
-		variation.variation_embolden = 1.1
-		variation.spacing_glyph = 1
-		_meme_font = variation
+		var bold := FontVariation.new()
+		bold.base_font = ThemeDB.fallback_font
+		bold.variation_embolden = 1.1
+		bold.spacing_glyph = 1
+		_meme_font = bold
+		var system := SystemFont.new()
+		system.font_names = PackedStringArray(["Impact", "Haettenschweiler", "Anton", "Arial Black"])
+		system.font_weight = 700
+		# SystemFont falls back to some default font when none of the names exist; only use
+		# it when one of them really is installed.
+		var installed: PackedStringArray = OS.get_system_fonts()
+		for wanted: String in system.font_names:
+			if installed.has(wanted):
+				system.fallbacks = [bold]
+				_meme_font = system
+				break
 	return _meme_font
 
 
